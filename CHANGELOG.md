@@ -24,6 +24,7 @@ All notable changes to the Pigmalea project will be documented in this file.
 
 ### Fixed
 - **Documentación desactualizada (`README.md`, `AI_REFERENCE.md`):** Actualizados nombres de archivos a extensión `.mjs`, parámetros de la API, puerto por defecto y descripción del pipeline de IA.
+- **Parser de Respuestas de IA (`ollama.mjs`):** Añadida función `parseAIJson()` con limpieza de fences markdown, extracción del primer objeto JSON y reparación de comas faltantes o sobrantes, para tolerar modelos que devuelven JSON casi válido como `minicpm-v4.6`.
 
 ---
 

@@ -117,6 +117,72 @@ export async function getInstalledVisionModels() {
 }
 
 /**
+ * Attempts to parse a possibly malformed JSON string returned by the vision model.
+ * It removes markdown fences, fixes missing commas between top-level object properties,
+ * trims trailing commas and retries parsing before giving up.
+ * @param {string} raw - Raw model output.
+ * @returns {Object} Parsed object.
+ * @throws {Error} If the content cannot be parsed as JSON.
+ */
+function parseAIJson(raw) {
+  if (!raw || typeof raw !== 'string') {
+    throw new Error('AI output was empty.');
+  }
+
+  // Remove markdown code fences if present
+  let cleaned = raw
+    .replace(/^\s*```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '')
+    .trim();
+
+  const tryParse = (str) => {
+    try {
+      return JSON.parse(str);
+    } catch {
+      return null;
+    }
+  };
+
+  let result = tryParse(cleaned);
+  if (result) return result;
+
+  // Try extracting the first JSON object from the text
+  const firstObjectMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (firstObjectMatch) {
+    result = tryParse(firstObjectMatch[0]);
+    if (result) return result;
+  }
+
+  // Fix missing commas between adjacent top-level properties in an object
+  // e.g. "key": value\n  "key2": ...  ->  "key": value,\n  "key2": ...
+  let repaired = cleaned
+    .replace(/("\s*)\}\s*,?\s*("[a-zA-Z0-9_]+":)/g, '$1},\n$2')
+    .replace(/("\s*\S+?)\s*\n\s*("[a-zA-Z0-9_]+":)/g, '$1,\n$2')
+    .replace(/,\s*\}/g, '}')
+    .replace(/,\s*\]/g, ']');
+
+  result = tryParse(repaired);
+  if (result) {
+    console.log('Successfully parsed AI JSON after repair.');
+    return result;
+  }
+
+  // Last-ditch: try parsing line-by-line merged object fragments
+  try {
+    const merged = cleaned
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .join(',');
+    result = tryParse(merged);
+    if (result) return result;
+  } catch {}
+
+  console.error('Failed to parse Ollama response as JSON. Content was:', raw);
+  throw new Error('AI output was not in the expected JSON format.');
+}
+
+/**
  * Queries Ollama's local tags to determine which vision model is installed.
  * @returns {Promise<string>} The model name to use.
  */
@@ -246,35 +312,31 @@ Do not include any text outside the JSON object. Do not include markdown code bl
       throw new Error('Ollama returned an empty response.');
     }
 
-    // 5. Parse the JSON result
-    try {
-      const parsedResult = JSON.parse(content);
-      // Validate structure basics
-      if (!parsedResult.adjustments) {
-        parsedResult.adjustments = {
-          brightness: 0.0,
-          contrast: 1.0,
-          saturation: 1.0,
-          sharpness: 0.0,
-          denoise: false,
-          upscale: true,
-          rotate: 0,
-          temperature: 1.0,
-          tint: 1.0
-        };
-      } else {
-        if (parsedResult.adjustments.temperature === undefined) {
-          parsedResult.adjustments.temperature = 1.0;
-        }
-        if (parsedResult.adjustments.tint === undefined) {
-          parsedResult.adjustments.tint = 1.0;
-        }
+    // 5. Parse the JSON result with graceful repair for malformed model output
+    const parsedResult = parseAIJson(content);
+
+    // Validate structure basics
+    if (!parsedResult.adjustments) {
+      parsedResult.adjustments = {
+        brightness: 0.0,
+        contrast: 1.0,
+        saturation: 1.0,
+        sharpness: 0.0,
+        denoise: false,
+        upscale: true,
+        rotate: 0,
+        temperature: 1.0,
+        tint: 1.0
+      };
+    } else {
+      if (parsedResult.adjustments.temperature === undefined) {
+        parsedResult.adjustments.temperature = 1.0;
       }
-      return parsedResult;
-    } catch (parseError) {
-      console.error('Failed to parse Ollama response as JSON. Content was:', content);
-      throw new Error('AI output was not in the expected JSON format.');
+      if (parsedResult.adjustments.tint === undefined) {
+        parsedResult.adjustments.tint = 1.0;
+      }
     }
+    return parsedResult;
 
   } catch (error) {
     console.error('Ollama analysis error:', error);
