@@ -39,31 +39,35 @@ export async function enhanceImage(inputPath, outputPath, options = {}) {
     // 1. Auto-rotate based on EXIF orientation metadata to respect original rotation
     pipeline = pipeline.rotate();
 
-    // 2. Denoise (Median filter) - Apply early to clean noise before resizing
+    // 2. Manual rotation if requested (90, 180, 270)
+    if (rotate && rotate !== 0) {
+      console.log(`Applying manual rotation: ${rotate} degrees`);
+      pipeline = pipeline.rotate(parseInt(rotate));
+    }
+
+    // 3. Denoise (Median filter) - Apply early to clean noise before tonal adjustments
     if (denoise) {
       pipeline = pipeline.median(3);
     }
 
-    // 3. Upscaling (2x resizing with Lanczos interpolation if width < 1600px)
-    let currentWidth = metadata.width || 0;
-    const isRotated = metadata.orientation && metadata.orientation >= 5 && metadata.orientation <= 8;
-    if (isRotated && metadata.height) {
-      currentWidth = metadata.height;
-    }
+    // 4. White balance (temperature and tint) using recomb in sRGB space
+    //    Keeping the pipeline in sRGB avoids colourspace conversion issues that can
+    //    produce black/invalid output when combined with contrast/brightness ops.
+    const tempMultiplier = parseFloat(temperature !== undefined ? temperature : 1.0);
+    const tintMultiplier = parseFloat(tint !== undefined ? tint : 1.0);
 
-    if (upscale && currentWidth && currentWidth < 1600) {
-      const targetWidth = Math.round(currentWidth * 2);
-      console.log(`Upscaling image width from ${currentWidth}px to ${targetWidth}px (EXIF orientation corrected)`);
-      pipeline = pipeline.resize({
-        width: targetWidth,
-        kernel: sharp.kernel.lanczos
-      });
-    }
+    if (tempMultiplier !== 1.0 || tintMultiplier !== 1.0) {
+      const rScale = tempMultiplier;
+      const gScale = tintMultiplier;
+      const bScale = tempMultiplier !== 0 ? (2.0 - tempMultiplier) : 1.0;
 
-    // 4. Manual rotation if requested (90, 180, 270)
-    if (rotate && rotate !== 0) {
-      console.log(`Applying manual rotation: ${rotate} degrees`);
-      pipeline = pipeline.rotate(parseInt(rotate));
+      console.log(`Applying white balance: Red=${rScale.toFixed(2)}, Green=${gScale.toFixed(2)}, Blue=${bScale.toFixed(2)}`);
+
+      pipeline = pipeline.recomb([
+        [rScale, 0, 0],
+        [0, gScale, 0],
+        [0, 0, bScale]
+      ]);
     }
 
     // 5. Brightness and Saturation modulation
@@ -86,39 +90,32 @@ export async function enhanceImage(inputPath, outputPath, options = {}) {
       pipeline = pipeline.linear(a, b);
     }
 
-    // 7. White balance (temperature and tint) using recomb in linear space
-    const tempMultiplier = parseFloat(temperature !== undefined ? temperature : 1.0);
-    const tintMultiplier = parseFloat(tint !== undefined ? tint : 1.0);
-
-    if (tempMultiplier !== 1.0 || tintMultiplier !== 1.0) {
-      const rScale = tempMultiplier;
-      const gScale = tintMultiplier;
-      const bScale = tempMultiplier !== 0 ? (2.0 - tempMultiplier) : 1.0;
-
-      console.log(`Applying white balance: Red=${rScale.toFixed(2)}, Green=${gScale.toFixed(2)}, Blue=${bScale.toFixed(2)}`);
-
-      pipeline = pipeline
-        .pipelineColourspace('scrgb')
-        .recomb([
-          [rScale, 0, 0],
-          [0, gScale, 0],
-          [0, 0, bScale]
-        ])
-        .toColourspace('srgb');
+    // 7. Upscaling (2x resizing with Lanczos interpolation if width < 1600px)
+    let currentWidth = metadata.width || 0;
+    const isRotated = metadata.orientation && metadata.orientation >= 5 && metadata.orientation <= 8;
+    if (isRotated && metadata.height) {
+      currentWidth = metadata.height;
     }
 
-    // 7. Sharpening filter
+    if (upscale && currentWidth && currentWidth < 1600) {
+      const targetWidth = Math.round(currentWidth * 2);
+      console.log(`Upscaling image width from ${currentWidth}px to ${targetWidth}px (EXIF orientation corrected)`);
+      pipeline = pipeline.resize({
+        width: targetWidth,
+        kernel: sharp.kernel.lanczos
+      });
+    }
+
+    // 8. Sharpening filter (always last to avoid amplifying noise)
     if (sharpness > 0.05) {
       const sigma = 0.5 + (parseFloat(sharpness) * 0.5);
-      pipeline = pipeline.sharpen({
-        sigma: sigma
-      });
+      pipeline = pipeline.sharpen({ sigma });
     }
 
     // Save the file
     const info = await pipeline.toFile(outputPath);
     console.log(`Image enhanced successfully. New size: ${info.width}x${info.height}, ${info.size} bytes.`);
-    
+
     return {
       width: info.width,
       height: info.height,

@@ -960,6 +960,9 @@ button, input, select, textarea {
 
 .comparison-container {
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
@@ -969,8 +972,8 @@ button, input, select, textarea {
 
 .comparison-card {
   width: 100%;
-  aspect-ratio: 4/3;
-  max-height: 600px;
+  max-width: 100%;
+  max-height: 78vh;
   background: #090b11;
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -1667,5 +1670,21 @@ input[type="range"]::-webkit-slider-thumb:hover {
   .bulk-buttons button {
     width: 100%;
   }
+}
+
+.download-buttons, .copy-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.copy-buttons {
+  margin-top: 10px !important;
+}
+
+.download-buttons a, .copy-buttons button {
+  flex: 1;
+  text-align: center;
+  justify-content: center;
 }
 

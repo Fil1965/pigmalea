@@ -428,8 +428,12 @@
                     <div class="meta-row" id="meta-enh-row"><span>Optimizado:</span> <span id="meta-enh-res">0x0</span> (<span id="meta-enh-size">0 KB</span>)</div>
                   </div>
                   <div class="download-buttons">
-                    <a id="btn-dl-original" href="#" download class="btn btn-secondary btn-sm"><i class="fa-solid fa-download"></i> Original</a>
-                    <a id="btn-dl-enhanced" href="#" download class="btn btn-primary btn-sm hidden"><i class="fa-solid fa-download"></i> Optimizado</a>
+                    <a id="btn-dl-original" href="#" download class="btn btn-secondary btn-sm" title="Descargar original"><i class="fa-solid fa-download"></i> Original</a>
+                    <a id="btn-dl-enhanced" href="#" download class="btn btn-primary btn-sm hidden" title="Descargar optimizada"><i class="fa-solid fa-download"></i> Optimizado</a>
+                  </div>
+                  <div class="copy-buttons">
+                    <button id="btn-copy-original" class="btn btn-secondary btn-sm" onclick="copyOriginalImage()" title="Copiar original al portapapeles"><i class="fa-solid fa-copy"></i> Copiar Original</button>
+                    <button id="btn-copy-enhanced" class="btn btn-primary btn-sm hidden" onclick="copyEnhancedImage()" title="Copiar optimizada al portapapeles"><i class="fa-solid fa-copy"></i> Copiar Optimizado</button>
                   </div>
                 </div>
               </div>

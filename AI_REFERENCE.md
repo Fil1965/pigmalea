@@ -86,11 +86,70 @@ Do not include any text outside the JSON object. Do not include markdown code bl
 
 ---
 
+## Orden del Pipeline de Mejora
+
+`imageProcessor.mjs` aplica las operaciones en un orden deliberado para evitar artefactos y degradaciones. El orden actual es:
+
+1. **Auto-rotación EXIF** y **rotación manual**.
+2. **Reducción de ruido** (`median`).
+3. **Balance de blancos** (`temperature`/`tint` vía `recomb`).
+4. **Brillo y saturación** (`modulate`).
+5. **Contraste** (`linear`).
+6. **Upscaling** (`resize` con Lanczos).
+7. **Nitidez** (`sharpen`).
+
+> **Nota sobre el espacio de color:** El balance de blancos se aplica directamente sobre la imagen en su espacio de trabajo sRGB mediante `.recomb()`. Se evita el cambio explícito a `scrgb` para prevenir salidas negras o inválidas que pueden producirse al combinar conversiones de espacio de color con operaciones de contraste/brightness en ciertos perfiles de imagen.
+
+---
+
 ## Traducción de Recomendaciones a Parámetros de Sharp
 
 Una vez obtenidas las directrices de la IA (o personalizadas por el usuario), el motor de procesamiento `imageProcessor.mjs` mapea estas propiedades numéricas a operaciones de manipulación de píxeles.
 
-### 1. Brillo (Brightness)
+### 1. Rotación (Rotate)
+*   **Parámetro IA:** `adjustments.rotate` (valores permitidos: `0`, `90`, `180`, `270`)
+*   **Mapeo Sharp:** Se aplica `.rotate()` para respetar la orientación EXIF. Si el usuario/IA solicita una rotación adicional, se aplica un segundo `.rotate(ángulo)`.
+*   **Código:**
+    ```javascript
+    pipeline = pipeline.rotate();          // Auto-rotación EXIF
+    if (rotate && rotate !== 0) {
+      pipeline = pipeline.rotate(parseInt(rotate));
+    }
+    ```
+
+### 2. Reducción de Ruido (Denoise)
+*   **Parámetro IA:** `adjustments.denoise` (booleano)
+*   **Mapeo Sharp:** Si es verdadero, se aplica un filtro de mediana con un radio de `3px` para filtrar el ruido conservando la definición geométrica general.
+*   **Código:**
+    ```javascript
+    pipeline = pipeline.median(3);
+    ```
+
+### 3. Temperatura de Color (Temperature)
+*   **Parámetro IA:** `adjustments.temperature` (rango: `0.5` a `1.5`, `1.0` neutro)
+*   **Mapeo Sharp:** Balance de blancos sencillo multiplicando los canales rojo y azul. Valores `< 1.0` enfrían la imagen (más azul), valores `> 1.0` la calientan (más naranja/rojo).
+*   **Código:**
+    ```javascript
+    const rScale = temperature;
+    const gScale = tint;        // combinado en la misma matriz
+    const bScale = temperature !== 0 ? (2.0 - temperature) : 1.0;
+    pipeline = pipeline.recomb([
+      [rScale, 0, 0],
+      [0, gScale, 0],
+      [0, 0, bScale]
+    ]);
+    ```
+
+### 4. Matiz de Color (Tint)
+*   **Parámetro IA:** `adjustments.tint` (rango: `0.5` a `1.5`, `1.0` neutro)
+*   **Mapeo Sharp:** Se aplica junto con la temperatura en la misma matriz `.recomb()` para corregir dominantes verdes/magentas ajustando el canal verde.
+*   **Código:**
+    ```javascript
+    const gScale = tint;
+    // Incluido en la matriz de recomb descrita en la sección de Temperatura
+    ```
+
+### 5. Brillo (Brightness)
 *   **Parámetro IA:** `adjustments.brightness` (rango: `-0.5` a `0.5`)
 *   **Mapeo Sharp:** Se utiliza el método `.modulate()` ajustando el factor multiplicativo a `1.0 + brightness * 0.4` para evitar recortes de luces altas.
 *   **Código:**
@@ -98,7 +157,7 @@ Una vez obtenidas las directrices de la IA (o personalizadas por el usuario), el
     pipeline = pipeline.modulate({ brightness: 1.0 + brightness * 0.4 });
     ```
 
-### 2. Saturación (Saturation)
+### 6. Saturación (Saturation)
 *   **Parámetro IA:** `adjustments.saturation` (rango: `0.0` a `2.0`, donde `1.0` es neutro)
 *   **Mapeo Sharp:** Método `.modulate()` aplicando directamente el factor como multiplicador de saturación.
 *   **Código:**
@@ -106,7 +165,7 @@ Una vez obtenidas las directrices de la IA (o personalizadas por el usuario), el
     pipeline = pipeline.modulate({ saturation: saturation });
     ```
 
-### 3. Contraste (Contrast)
+### 7. Contraste (Contrast)
 *   **Parámetro IA:** `adjustments.contrast` (rango: `0.5` a `2.0`, donde `1.0` es neutro)
 *   **Mapeo Sharp:** Se implementa una transformación lineal alrededor de gris medio (128) con el método `.linear(a, b)` para estirar o comprimir los valores cromáticos.
     *   Fórmula: $f(x) = a \cdot x + b$ donde $a = \text{contrast}$ y $b = 128 \cdot (1.0 - \text{contrast})$.
@@ -115,24 +174,7 @@ Una vez obtenidas las directrices de la IA (o personalizadas por el usuario), el
     pipeline = pipeline.linear(contrast, 128 * (1.0 - contrast));
     ```
 
-### 4. Nitidez (Sharpness)
-*   **Parámetro IA:** `adjustments.sharpness` (rango: `0.0` a `5.0`)
-*   **Mapeo Sharp:** Se aplica un filtro de nitidez convolucional (`.sharpen()`). El nivel se mapea al radio `sigma` de la máscara de desenfoque.
-*   **Código:**
-    ```javascript
-    const sigma = 0.5 + (sharpness * 0.5);
-    pipeline = pipeline.sharpen({ sigma: sigma });
-    ```
-
-### 5. Reducción de Ruido (Denoise)
-*   **Parámetro IA:** `adjustments.denoise` (booleano)
-*   **Mapeo Sharp:** Si es verdadero, se aplica un filtro de mediana con un radio de `3px` para filtrar el ruido conservando la definición geométrica general.
-*   **Código:**
-    ```javascript
-    pipeline = pipeline.median(3);
-    ```
-
-### 6. Superresolución / Redimensionamiento (Upscale)
+### 8. Superresolución / Redimensionamiento (Upscale)
 *   **Parámetro IA:** `adjustments.upscale` (booleano)
 *   **Mapeo Sharp:** Si está activo y el ancho de la imagen original es inferior a `1600px`, se duplica el ancho de la imagen manteniendo su proporción nativa y aplicando el algoritmo de interpolación **Lanczos** (ideal para conservar el detalle sin emborronar). El ancho se corrige según la orientación EXIF.
 *   **Código:**
@@ -143,41 +185,13 @@ Una vez obtenidas las directrices de la IA (o personalizadas por el usuario), el
     });
     ```
 
-### 7. Rotación (Rotate)
-*   **Parámetro IA:** `adjustments.rotate` (valores permitidos: `0`, `90`, `180`, `270`)
-*   **Mapeo Sharp:** Antes de cualquier otro ajuste se aplica `.rotate()` para respetar la orientación EXIF. Si el usuario/IA solicita una rotación adicional, se aplica un segundo `.rotate(ángulo)`.
+### 9. Nitidez (Sharpness)
+*   **Parámetro IA:** `adjustments.sharpness` (rango: `0.0` a `5.0`)
+*   **Mapeo Sharp:** Se aplica un filtro de nitidez convolucional (`.sharpen()`). El nivel se mapea al radio `sigma` de la máscara de desenfoque.
 *   **Código:**
     ```javascript
-    pipeline = pipeline.rotate();          // Auto-rotación EXIF
-    if (rotate && rotate !== 0) {
-      pipeline = pipeline.rotate(parseInt(rotate));
-    }
-    ```
-
-### 8. Temperatura de Color (Temperature)
-*   **Parámetro IA:** `adjustments.temperature` (rango: `0.5` a `1.5`, `1.0` neutro)
-*   **Mapeo Sharp:** Se realiza un balance de blancos sencillo en espacio de color lineal `scrgb` con `.recomb()`. Valores `< 1.0` enfrían la imagen (más azul), valores `> 1.0` la calientan (más naranja/rojo).
-*   **Código:**
-    ```javascript
-    const rScale = temperature;
-    const bScale = temperature !== 0 ? (2.0 - temperature) : 1.0;
-    pipeline = pipeline
-      .pipelineColourspace('scrgb')
-      .recomb([
-        [rScale, 0, 0],
-        [0, 1.0, 0],
-        [0, 0, bScale]
-      ])
-      .toColourspace('srgb');
-    ```
-
-### 9. Matiz de Color (Tint)
-*   **Parámetro IA:** `adjustments.tint` (rango: `0.5` a `1.5`, `1.0` neutro)
-*   **Mapeo Sharp:** Se aplica junto con la temperatura en la misma matriz `.recomb()` para corregir dominantes verdes/magentas ajustando el canal verde.
-*   **Código:**
-    ```javascript
-    const gScale = tint;
-    // Incluido en la matriz de recomb descrita en la sección de Temperatura
+    const sigma = 0.5 + (sharpness * 0.5);
+    pipeline = pipeline.sharpen({ sigma: sigma });
     ```
 
 ---

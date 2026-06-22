@@ -280,6 +280,15 @@ function renderGallery() {
   });
 
   updateBulkActionsToolbar();
+
+  // Restore scroll position if returning from workspace
+  if (state.lastScrollTop !== undefined && state.lastScrollTop !== null) {
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+      mainContent.scrollTop = state.lastScrollTop;
+    }
+    state.lastScrollTop = null;
+  }
 }
 
 async function deleteImage(id, event) {
@@ -674,12 +683,19 @@ function openWorkspace(imageId) {
   const image = state.images.find(img => img.id === imageId);
   if (!image) return;
 
+  // Save current scroll position of the gallery
+  const mainContent = document.querySelector('.main-content');
+  state.lastScrollTop = mainContent ? mainContent.scrollTop : 0;
+
   state.currentImage = image;
   document.getElementById('workspace-title').textContent = `Optimizando: ${image.original_name}`;
   
   // Prepare canvases
   document.getElementById('img-original').src = image.original_url;
   document.getElementById('img-single').src = image.original_url;
+
+  // Adjust comparison container to match image aspect ratio and viewport
+  fitComparisonCardToImage(image);
 
   // Setup layout depending on status
   if (image.status === 'enhanced') {
@@ -688,13 +704,15 @@ function openWorkspace(imageId) {
     document.getElementById('single-image-wrapper').classList.add('hidden');
     document.getElementById('btn-dl-enhanced').classList.remove('hidden');
     document.getElementById('btn-dl-enhanced').href = image.enhanced_url;
-    
+    document.getElementById('btn-copy-enhanced').classList.remove('hidden');
+
     // Reset Slider bar positions to center
     resetSliderHandle();
   } else {
     document.getElementById('image-slider-wrapper').classList.remove('active');
     document.getElementById('single-image-wrapper').classList.remove('hidden');
     document.getElementById('btn-dl-enhanced').classList.add('hidden');
+    document.getElementById('btn-copy-enhanced').classList.add('hidden');
   }
 
   document.getElementById('btn-dl-original').href = image.original_url;
@@ -849,13 +867,17 @@ async function enhanceImage() {
     document.getElementById('img-enhanced').src = data.image.enhanced_url;
     document.getElementById('image-slider-wrapper').classList.add('active');
     document.getElementById('single-image-wrapper').classList.add('hidden');
-    
+
+    // Re-fit comparison card to the enhanced image dimensions
+    fitComparisonCardToImage(state.currentImage);
+
     // Update Details
     document.getElementById('meta-enh-row').classList.remove('hidden');
     document.getElementById('meta-enh-res').textContent = `${data.image.enhanced_width}x${data.image.enhanced_height}`;
     document.getElementById('meta-enh-size').textContent = formatBytes(data.image.enhanced_size);
     document.getElementById('btn-dl-enhanced').classList.remove('hidden');
     document.getElementById('btn-dl-enhanced').href = data.image.enhanced_url;
+    document.getElementById('btn-copy-enhanced').classList.remove('hidden');
 
     resetSliderHandle();
     showToast('Imagen mejorada correctamente.', 'success');
@@ -950,6 +972,39 @@ function resetSliderHandle() {
     afterContainer.style.width = '100%';
     afterContainer.style.clipPath = 'inset(0 0 0 50%)';
   }
+}
+
+/**
+ * Sizes the comparison card to best fit the viewport while preserving the
+ * image's native aspect ratio. This avoids huge black bars for vertical photos.
+ */
+function fitComparisonCardToImage(image) {
+  const card = document.querySelector('.comparison-card');
+  if (!card || !image.width || !image.height) return;
+
+  // Use the image's natural aspect ratio so the container matches its shape
+  const aspectRatio = image.width / image.height;
+  card.style.aspectRatio = `${aspectRatio}`;
+
+  // For vertical images we want to use more height; cap very narrow ratios
+  // so the card never becomes a skyscraper taller than the viewport.
+  const MAX_VERTICAL_RATIO = 0.55; // ~9:16
+  if (aspectRatio < MAX_VERTICAL_RATIO) {
+    card.style.aspectRatio = `${MAX_VERTICAL_RATIO}`;
+  }
+
+  // Once the actual image loads, fine-tune if the displayed image differs
+  // (e.g. after EXIF rotation or enhancement changes dimensions)
+  const displayedImg = document.getElementById('img-single');
+  const tune = () => {
+    if (displayedImg.naturalWidth && displayedImg.naturalHeight) {
+      const liveRatio = displayedImg.naturalWidth / displayedImg.naturalHeight;
+      const finalRatio = Math.max(liveRatio, MAX_VERTICAL_RATIO);
+      card.style.aspectRatio = `${finalRatio}`;
+    }
+  };
+  displayedImg.onload = tune;
+  if (displayedImg.complete) tune();
 }
 
 // ==========================================================================
@@ -1085,5 +1140,62 @@ function updateModelNameElements() {
   document.querySelectorAll('.ai-model-name').forEach(el => {
     el.textContent = activeModelName;
   });
+}
+
+// ==========================================================================
+// Copy to Clipboard Operations
+// ==========================================================================
+async function copyOriginalImage() {
+  if (!state.currentImage) return;
+  await copyImageToClipboard(state.currentImage.original_url);
+}
+
+async function copyEnhancedImage() {
+  if (!state.currentImage || !state.currentImage.enhanced_url) return;
+  await copyImageToClipboard(state.currentImage.enhanced_url);
+}
+
+async function copyImageToClipboard(imageUrl) {
+  try {
+    showToast('Copiando imagen...', 'info');
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
+    
+    // Create image element in memory
+    const img = new Image();
+    img.src = URL.createObjectURL(blob);
+    
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+    });
+    
+    // Draw on Canvas to convert any format to PNG (standard clipboard format)
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    
+    canvas.toBlob(async (pngBlob) => {
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'image/png': pngBlob
+          })
+        ]);
+        showToast('¡Imagen copiada al portapapeles!', 'success');
+      } catch (clipboardErr) {
+        console.error('Clipboard write failed:', clipboardErr);
+        showToast('Error al copiar imagen al portapapeles.', 'error');
+      } finally {
+        URL.revokeObjectURL(img.src);
+      }
+    }, 'image/png');
+    
+  } catch (err) {
+    console.error('Failed to copy image:', err);
+    showToast('Error al procesar la imagen para copiar.', 'error');
+  }
 }
 

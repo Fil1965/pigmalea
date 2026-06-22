@@ -14,6 +14,7 @@ All notable changes to the Pigmalea project will be documented in this file.
 - **Rotación Manual y EXIF (`imageProcessor.mjs`, frontend):** Añadido parámetro `rotate` (0/90/180/270) y auto-rotación basada en metadatos EXIF antes del procesamiento.
 - **Selector de Modelo de Visión (`server.mjs`, `public/app.js`):** Nueva ruta `GET /api/info/model` y desplegable en el workspace para elegir manualmente entre los modelos de visión instalados en Ollama. El modelo elegido se guarda en `localStorage`.
 - **Indicador de Versión en la UI (`server.mjs`, `public/index.html`, `public/app.js`):** Nueva ruta `GET /api/info/version` y badge junto al nombre "Pigmalea" en la barra lateral, mostrando la versión de `package.json`.
+- **Ajuste Dinámico del Visor de Imágenes (`public/style.css`, `public/app.js`):** El contenedor de comparación ahora adopta la relación de aspecto de la foto cargada (con un límite para fotos muy verticales) y respeta `max-height: 78vh`, evitando que las imágenes verticales se vean diminutas con grandes bandas negras.
 - **Utilidad de Liberación de Puerto (`kill-server.mjs`):** Script multiplataforma para terminar procesos que escuchan en el puerto configurado (`PORT`).
 - **Lista de Modelos Verificados (`working-models.json`):** Archivo generado automáticamente por el suite de tests con los modelos de Ollama que completan el análisis con éxito; `ollama.mjs` la utiliza para filtrar modelos confiables.
 
@@ -25,6 +26,7 @@ All notable changes to the Pigmalea project will be documented in this file.
 ### Fixed
 - **Documentación desactualizada (`README.md`, `AI_REFERENCE.md`):** Actualizados nombres de archivos a extensión `.mjs`, parámetros de la API, puerto por defecto y descripción del pipeline de IA.
 - **Parser de Respuestas de IA (`ollama.mjs`):** Añadida función `parseAIJson()` con limpieza de fences markdown, extracción del primer objeto JSON y reparación de comas faltantes o sobrantes, para tolerar modelos que devuelven JSON casi válido como `minicpm-v4.6`.
+- **Imagen Mejorada Totalmente Negra (`imageProcessor.mjs`):** Reordenado el pipeline de Sharp y eliminado el cambio explícito a `pipelineColourspace('scrgb')` durante el balance de blancos, evitando conversiones de espacio de color que producían salidas negras en algunas imágenes.
 
 ---
 
