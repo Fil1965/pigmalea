@@ -136,3 +136,14 @@ node --test tests/ollama-models.test.mjs llava:latest
 ```
 
 Los resultados se guardan en `tests/results/` y el resumen en `tests/results/summary.md`. El archivo `working-models.json` se actualiza automáticamente con los modelos que completaron el análisis con éxito.
+
+---
+
+## Roadmap / Próximas Mejoras
+
+Aquí se recopilan las ideas y optimizaciones propuestas para el desarrollo futuro de Pigmalea:
+
+*   **Traducción de Descripciones en Modelos de Baja Memoria (VLM):**
+    *   *Problema*: Los modelos de visión locales muy pequeños (3B/7B de parámetros) pierden precisión analítica o rompen el esquema JSON si se les fuerza a describir/explicar en español.
+    *   *Solución*: Implementar un pipeline de dos fases. Primero, realizar el análisis VLM normalizado en inglés. Segundo, realizar una llamada rápida de traducción de texto (aprovechando el modelo en VRAM) para pasar los campos `description`, `flaws` y `explanation` del JSON resultante al idioma del usuario (español) antes de guardarlos en la base de datos.
+
