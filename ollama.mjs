@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import sharp from 'sharp';
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://localhost:11434';
 
@@ -160,8 +161,18 @@ export async function getAvailableVisionModel() {
  */
 export async function analyzeImage(filePath, selectedModel = null, keepAlive = null) {
   try {
-    // 1. Read file and convert to base64
-    const fileBuffer = await fs.readFile(filePath);
+    // 1. Read file, auto-orient it using Sharp to handle EXIF rotation, and convert to base64
+    let fileBuffer;
+    try {
+      fileBuffer = await sharp(filePath)
+        .rotate()
+        .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 80 })
+        .toBuffer();
+    } catch (sharpError) {
+      console.warn('Sharp processing failed, falling back to reading raw file:', sharpError.message);
+      fileBuffer = await fs.readFile(filePath);
+    }
     const base64Image = fileBuffer.toString('base64');
 
     // 2. Auto-detect or use user selected model

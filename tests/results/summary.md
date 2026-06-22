@@ -2,20 +2,20 @@
 
 This report lists the results of running image analysis on each Ollama model available in the system using the test image `tests/test.jpg`.
 
-*Report generated on: 22/6/2026, 18:32:44*
+*Report generated on: 22/6/2026, 19:05:34*
 
 ## Execution Statistics
 - **Total Models Evaluated**: 14
 - **Successful Vision Analyses**: 6
 - **Failed/Unsupported Models**: 8
-- **Total Suite Execution Time**: 436.51s
+- **Total Suite Execution Time**: 439.34s
 
 ## Model Performance Overview
 
 | Model | Status | Execution Time (s) | Description Summary / Error |
 | :--- | :--- | :--- | :--- |
 | **kimi-k2.7-code:cloud** | ✅ Success | 4.16s | A terracotta multi-pot planter with assorted succulents sits on a brown tiled floor against a white wall. |
-| **llava:latest** | ✅ Success | 12.19s | The image shows a potted plant with various succulents, placed on a tiled floor. The lighting in the room is soft and diffused, creating a calm atmosphere. There are no people or moving objects in the scene. |
+| **llava:latest** | ✅ Success | 15.01s | The image shows a potted plant with various plants and flowers, placed on a tiled floor in an indoor setting. The lighting appears to be artificial, casting soft shadows on the floor. |
 | **minicpm-v4.6:latest** | ✅ Success | 17.30s | The image shows potted succulent plants in terracotta pots placed on a tiled floor, with visible blurriness and low contrast. The scene appears to be outdoors or in a semi-enclosed space with a white wall background. |
 | **qwen3-vl:2b** | ✅ Success | 42.08s | A terracotta pot arrangement with multiple succulents placed on a tiled floor against a white wall. |
 | **qwen3-vl:8b** | ✅ Success | 259.64s | A terracotta pot arrangement with succulent plants placed on a tiled surface against a wall. |
@@ -60,8 +60,8 @@ This report lists the results of running image analysis on each Ollama model ava
 ### Model: `llava:latest`
 
 - **Status**: ✅ Success
-- **Time Taken**: 12.19 seconds
-- **Explanation**: *To enhance the image, it would benefit from increased brightness and contrast to make the details of the plant more visible. The sharpness could be improved by applying a slight sharpening filter. Since the image is already in color, no adjustments are needed for temperature or tint.*
+- **Time Taken**: 15.01 seconds
+- **Explanation**: *To enhance the image, a moderate increase in brightness and contrast would help to bring out more detail in the plants. Sharpening could also be applied to improve the overall clarity of the image. Denoising would help to reduce the pixelation, while upscaling is not recommended due to the low resolution. Rotating the image is not necessary as it appears to be oriented correctly.*
 - **Adjustments Applied**:
   ```json
 {
@@ -78,7 +78,7 @@ This report lists the results of running image analysis on each Ollama model ava
   ```
 
 #### Analysis Details
-> The image shows a potted plant with various succulents, placed on a tiled floor. The lighting in the room is soft and diffused, creating a calm atmosphere. There are no people or moving objects in the scene.
+> The image shows a potted plant with various plants and flowers, placed on a tiled floor in an indoor setting. The lighting appears to be artificial, casting soft shadows on the floor.
 
 #### Visual Enhancement Output
 ![Enhanced Image for llava-latest](./llava_latest_enhanced.jpg)
