@@ -227,61 +227,6 @@
 
             <!-- Right Side: AI Panel & Adjustments -->
             <div class="workspace-sidebar">
-              <!-- AI Diagnostics Card -->
-              <div class="sidebar-card ai-info-card">
-                <div class="card-header">
-                  <h3><i class="fa-solid fa-brain"></i> Diagnóstico de la IA</h3>
-                </div>
-                <div class="card-body" id="ai-status-body">
-                  <!-- Dynamic Model Selection -->
-                  <div class="control-group model-select-group hidden" id="model-select-wrapper" style="margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
-                    <div class="control-label" style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
-                      <i class="fa-solid fa-gears" style="color: var(--text-muted);"></i>
-                      <span>Modelo de Visión IA</span>
-                    </div>
-                    <select id="ai-model-select" class="select-dark" onchange="onModelSelectChange(this.value)">
-                      <!-- Options populated dynamically -->
-                    </select>
-                  </div>
-
-                  <!-- Analysis States -->
-                  <div id="ai-state-pending" class="ai-state-content">
-                    <p>La IA aún no ha analizado esta imagen. Solicita un diagnóstico para detectar fallos y obtener parámetros de mejora óptimos.</p>
-                    <button class="btn btn-primary btn-block btn-pulse" onclick="analyzeWithAI()">
-                      <i class="fa-solid fa-circle-nodes"></i> Analizar con <span class="ai-model-name">Llama 3.2 Vision</span>
-                    </button>
-                  </div>
-
-                  <div id="ai-state-loading" class="ai-state-content hidden">
-                    <div class="spinner-container">
-                      <div class="spinner"></div>
-                      <p><span class="ai-model-name">Llama 3.2 Vision</span> está analizando la imagen...</p>
-                      <small class="text-muted">(Esto puede tomar unos segundos la primera vez)</small>
-                    </div>
-                  </div>
-
-                  <div id="ai-state-completed" class="ai-state-content hidden">
-                    <div class="ai-report">
-                      <div class="report-item">
-                        <strong>Descripción:</strong>
-                        <p id="ai-report-description">...</p>
-                      </div>
-                      <div class="report-item">
-                        <strong>Fallos detectados:</strong>
-                        <ul id="ai-report-flaws" class="flaws-list"></ul>
-                      </div>
-                      <div class="report-item">
-                        <strong>Motivación:</strong>
-                        <p id="ai-report-explanation" class="explanation-text">...</p>
-                      </div>
-                    </div>
-                    <button class="btn btn-secondary btn-block btn-sm" onclick="analyzeWithAI()">
-                      <i class="fa-solid fa-rotate"></i> Re-analizar imagen
-                    </button>
-                  </div>
-                </div>
-              </div>
-
               <!-- Manual Adjustments Panel -->
               <div class="sidebar-card adjustments-card">
                 <div class="card-header">
@@ -374,6 +319,61 @@
                   <div id="enhance-loading" class="spinner-container hidden">
                     <div class="spinner"></div>
                     <p>Procesando imagen con Sharp...</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- AI Diagnostics Card -->
+              <div class="sidebar-card ai-info-card">
+                <div class="card-header">
+                  <h3><i class="fa-solid fa-brain"></i> Diagnóstico de la IA</h3>
+                </div>
+                <div class="card-body" id="ai-status-body">
+                  <!-- Dynamic Model Selection -->
+                  <div class="control-group model-select-group hidden" id="model-select-wrapper" style="margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
+                    <div class="control-label" style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+                      <i class="fa-solid fa-gears" style="color: var(--text-muted);"></i>
+                      <span>Modelo de Visión IA</span>
+                    </div>
+                    <select id="ai-model-select" class="select-dark" onchange="onModelSelectChange(this.value)">
+                      <!-- Options populated dynamically -->
+                    </select>
+                  </div>
+
+                  <!-- Analysis States -->
+                  <div id="ai-state-pending" class="ai-state-content">
+                    <p>La IA aún no ha analizado esta imagen. Solicita un diagnóstico para detectar fallos y obtener parámetros de mejora óptimos.</p>
+                    <button class="btn btn-primary btn-block btn-pulse" onclick="analyzeWithAI()">
+                      <i class="fa-solid fa-circle-nodes"></i> Analizar con <span class="ai-model-name">Llama 3.2 Vision</span>
+                    </button>
+                  </div>
+
+                  <div id="ai-state-loading" class="ai-state-content hidden">
+                    <div class="spinner-container">
+                      <div class="spinner"></div>
+                      <p><span class="ai-model-name">Llama 3.2 Vision</span> está analizando la imagen...</p>
+                      <small class="text-muted">(Esto puede tomar unos segundos la primera vez)</small>
+                    </div>
+                  </div>
+
+                  <div id="ai-state-completed" class="ai-state-content hidden">
+                    <div class="ai-report">
+                      <div class="report-item">
+                        <strong>Descripción:</strong>
+                        <p id="ai-report-description">...</p>
+                      </div>
+                      <div class="report-item">
+                        <strong>Fallos detectados:</strong>
+                        <ul id="ai-report-flaws" class="flaws-list"></ul>
+                      </div>
+                      <div class="report-item">
+                        <strong>Motivación:</strong>
+                        <p id="ai-report-explanation" class="explanation-text">...</p>
+                      </div>
+                    </div>
+                    <button class="btn btn-secondary btn-block btn-sm" onclick="analyzeWithAI()">
+                      <i class="fa-solid fa-rotate"></i> Re-analizar imagen
+                    </button>
                   </div>
                 </div>
               </div>

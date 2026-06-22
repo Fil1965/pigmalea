@@ -1,45 +1,51 @@
-import sqlite3Pkg from 'sqlite3';
+import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const sqlite3 = sqlite3Pkg.verbose();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const dbPath = path.join(__dirname, 'pigmalea.db');
 
-export const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error connecting to Pigmalea database:', err.message);
-  } else {
-    console.log('Connected to Pigmalea SQLite database.');
-  }
-});
+// Connect to SQLite database
+export const db = new Database(dbPath);
 
-// Promise-based query helpers
+// Enable WAL mode (Write-Ahead Logging) for better concurrency and speed
+db.pragma('journal_mode = WAL');
+
+// Promise-based query helpers for backward compatibility with server.mjs
 export const run = (sql, params = []) => {
   return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) reject(err);
-      else resolve({ id: this.lastID, changes: this.changes });
-    });
+    try {
+      const stmt = db.prepare(sql);
+      const result = stmt.run(params);
+      resolve({ id: result.lastInsertRowid, changes: result.changes });
+    } catch (err) {
+      reject(err);
+    }
   });
 };
 
 export const get = (sql, params = []) => {
   return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
+    try {
+      const stmt = db.prepare(sql);
+      const row = stmt.get(params);
+      resolve(row);
+    } catch (err) {
+      reject(err);
+    }
   });
 };
 
 export const all = (sql, params = []) => {
   return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
+    try {
+      const stmt = db.prepare(sql);
+      const rows = stmt.all(params);
+      resolve(rows);
+    } catch (err) {
+      reject(err);
+    }
   });
 };
 
