@@ -17,7 +17,9 @@ const DEFAULT_ADJUSTMENTS = {
   sharpness: 0,
   denoise: false,
   upscale: true,
-  rotate: 0
+  rotate: 0,
+  temperature: 1.0,
+  tint: 1.0
 };
 
 // ==========================================================================
@@ -490,7 +492,9 @@ async function enhanceImage() {
     sharpness: parseFloat(document.getElementById('slider-sharpness').value),
     denoise: document.getElementById('check-denoise').checked,
     upscale: document.getElementById('check-upscale').checked,
-    rotate: parseInt(document.getElementById('select-rotate').value)
+    rotate: parseInt(document.getElementById('select-rotate').value),
+    temperature: parseFloat(document.getElementById('slider-temperature').value),
+    tint: parseFloat(document.getElementById('slider-tint').value)
   };
 
   try {
@@ -552,6 +556,12 @@ function setSlidersValues(adjustments) {
 
   document.getElementById('slider-sharpness').value = defaults.sharpness;
   updateSliderVal('sharpness', defaults.sharpness);
+
+  document.getElementById('slider-temperature').value = defaults.temperature;
+  updateSliderVal('temperature', defaults.temperature);
+
+  document.getElementById('slider-tint').value = defaults.tint;
+  updateSliderVal('tint', defaults.tint);
 
   document.getElementById('check-denoise').checked = !!defaults.denoise;
   document.getElementById('check-upscale').checked = !!defaults.upscale;
@@ -665,9 +675,19 @@ async function fetchActiveModel() {
     const res = await fetch('/api/info/model');
     if (res.ok) {
       const data = await res.json();
-      if (data.model) {
-        activeModelName = formatModelName(data.model);
-        selectedAIModel = data.model;
+      const savedModel = localStorage.getItem('pigmalea_selected_model');
+      let activeModel = data.model;
+
+      if (data.models && data.models.length > 0) {
+        // Verify that the saved model is still installed and available
+        if (savedModel && data.models.includes(savedModel)) {
+          activeModel = savedModel;
+        }
+      }
+
+      if (activeModel) {
+        activeModelName = formatModelName(activeModel);
+        selectedAIModel = activeModel;
         updateModelNameElements();
       }
 
@@ -678,7 +698,7 @@ async function fetchActiveModel() {
           const opt = document.createElement('option');
           opt.value = m;
           opt.textContent = formatModelName(m) + ` (${m})`;
-          if (m === data.model) {
+          if (m === selectedAIModel) {
             opt.selected = true;
           }
           select.appendChild(opt);
@@ -701,6 +721,7 @@ function onModelSelectChange(val) {
   selectedAIModel = val;
   activeModelName = formatModelName(val);
   updateModelNameElements();
+  localStorage.setItem('pigmalea_selected_model', val);
 }
 
 function formatModelName(modelId) {
