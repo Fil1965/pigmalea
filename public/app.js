@@ -6,7 +6,10 @@ const state = {
   images: [],
   currentImage: null,
   activeView: 'gallery',
-  selectedFiles: []
+  selectedFiles: [],
+  selectedImageIds: [],
+  galleryFilter: 'all', // 'all' | 'enhanced' | 'unprocessed'
+  gallerySearch: ''
 };
 
 // Default adjustment parameters (neutral values)
@@ -173,47 +176,110 @@ async function loadImages() {
     const images = await res.json();
     state.images = images;
     
-    grid.innerHTML = '';
+    // Clear selection of items that might not exist anymore
+    state.selectedImageIds = state.selectedImageIds.filter(id => images.some(img => img.id === id));
     
-    if (images.length === 0) {
-      empty.classList.remove('hidden');
-      return;
-    }
-
-    images.forEach(img => {
-      const card = document.createElement('div');
-      card.className = 'image-card';
-      
-      const badgeClass = `badge-${img.status}`;
-      const statusLabel = img.status === 'uploaded' ? 'Subido' : (img.status === 'analyzed' ? 'Analizado' : 'Mejorado');
-      
-      // Determine what path to show in card preview (enhanced preferred)
-      const previewUrl = img.status === 'enhanced' ? img.enhanced_url : img.original_url;
-      const displaySize = formatBytes(img.status === 'enhanced' && img.enhanced_size ? img.enhanced_size : img.size);
-      const displayRes = img.status === 'enhanced' && img.enhanced_width ? `${img.enhanced_width}x${img.enhanced_height}` : `${img.width}x${img.height}`;
-
-      card.innerHTML = `
-        <div class="card-preview">
-          <img src="${previewUrl}" alt="${img.original_name}" loading="lazy">
-          <span class="badge ${badgeClass} card-badge">${statusLabel}</span>
-          <div class="card-overlay">
-            <button class="card-btn card-btn-view" onclick="openWorkspace(${img.id})" title="Abrir mesa de trabajo"><i class="fa-solid fa-laptop-code"></i></button>
-            <button class="card-btn card-btn-delete" onclick="deleteImage(${img.id}, event)" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
-          </div>
-        </div>
-        <div class="card-info">
-          <h4>${img.original_name}</h4>
-          <div class="card-meta">
-            <span>${displayRes}</span>
-            <span>${displaySize}</span>
-          </div>
-        </div>
-      `;
-      grid.appendChild(card);
-    });
+    renderGallery();
   } catch (err) {
     grid.innerHTML = `<div class="alert alert-danger"><i class="fa-solid fa-circle-exclamation"></i> ${err.message}</div>`;
   }
+}
+
+function renderGallery() {
+  const grid = document.getElementById('gallery-grid');
+  const empty = document.getElementById('gallery-empty');
+  
+  if (state.images.length === 0) {
+    grid.innerHTML = '';
+    empty.classList.remove('hidden');
+    updateBulkActionsToolbar();
+    return;
+  }
+
+  // Filter images
+  const filtered = state.images.filter(img => {
+    // 1. Status Filter
+    if (state.galleryFilter === 'enhanced' && img.status !== 'enhanced') {
+      return false;
+    }
+    if (state.galleryFilter === 'unprocessed' && img.status === 'enhanced') {
+      return false;
+    }
+
+    // 2. Search Text
+    if (state.gallerySearch.trim() !== '') {
+      const q = state.gallerySearch.toLowerCase().trim();
+      const nameMatch = img.original_name.toLowerCase().includes(q);
+      
+      let analysisMatch = false;
+      if (img.ai_analysis) {
+        const desc = (img.ai_analysis.description || '').toLowerCase();
+        const explanation = (img.ai_analysis.explanation || '').toLowerCase();
+        const flaws = Array.isArray(img.ai_analysis.flaws) 
+          ? img.ai_analysis.flaws.join(' ').toLowerCase() 
+          : '';
+        
+        analysisMatch = desc.includes(q) || explanation.includes(q) || flaws.includes(q);
+      }
+      
+      return nameMatch || analysisMatch;
+    }
+
+    return true;
+  });
+
+  grid.innerHTML = '';
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div class="spinner-container"><p>No se encontraron imágenes que coincidan con los criterios de búsqueda.</p></div>';
+    empty.classList.add('hidden');
+    updateBulkActionsToolbar();
+    return;
+  }
+
+  empty.classList.add('hidden');
+
+  filtered.forEach(img => {
+    const card = document.createElement('div');
+    const isSelected = state.selectedImageIds.includes(img.id);
+    card.className = `image-card${isSelected ? ' selected' : ''}`;
+    card.dataset.id = img.id;
+    
+    const badgeClass = `badge-${img.status}`;
+    const statusLabel = img.status === 'uploaded' ? 'Subido' : (img.status === 'analyzed' ? 'Analizado' : 'Mejorado');
+    
+    // Determine what path to show in card preview (enhanced preferred)
+    const previewUrl = img.status === 'enhanced' ? img.enhanced_url : img.original_url;
+    const displaySize = formatBytes(img.status === 'enhanced' && img.enhanced_size ? img.enhanced_size : img.size);
+    const displayRes = img.status === 'enhanced' && img.enhanced_width ? `${img.enhanced_width}x${img.enhanced_height}` : `${img.width}x${img.height}`;
+
+    card.innerHTML = `
+      <!-- Card Selection Checkbox -->
+      <div class="card-select-container" onclick="event.stopPropagation();">
+        <input type="checkbox" id="chk-img-${img.id}" class="card-checkbox" ${isSelected ? 'checked' : ''} onchange="handleImageSelect(${img.id}, this.checked)">
+        <label for="chk-img-${img.id}" class="card-checkbox-label"></label>
+      </div>
+
+      <div class="card-preview">
+        <img src="${previewUrl}" alt="${img.original_name}" loading="lazy">
+        <span class="badge ${badgeClass} card-badge">${statusLabel}</span>
+        <div class="card-overlay">
+          <button class="card-btn card-btn-view" onclick="openWorkspace(${img.id})" title="Abrir mesa de trabajo"><i class="fa-solid fa-laptop-code"></i></button>
+          <button class="card-btn card-btn-delete" onclick="deleteImage(${img.id}, event)" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
+        </div>
+      </div>
+      <div class="card-info">
+        <h4>${img.original_name}</h4>
+        <div class="card-meta">
+          <span>${displayRes}</span>
+          <span>${displaySize}</span>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  updateBulkActionsToolbar();
 }
 
 async function deleteImage(id, event) {
@@ -225,11 +291,270 @@ async function deleteImage(id, event) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
+    // Remove from selection if deleted
+    state.selectedImageIds = state.selectedImageIds.filter(x => x !== id);
+
     showToast('Imagen eliminada correctamente.', 'success');
     loadImages();
   } catch (err) {
     showToast(err.message, 'error');
   }
+}
+
+// ==========================================================================
+// Search & Filter Event Handlers
+// ==========================================================================
+function handleSearch(value) {
+  state.gallerySearch = value;
+  
+  const clearBtn = document.getElementById('search-clear-btn');
+  if (value.trim() !== '') {
+    clearBtn.classList.remove('hidden');
+  } else {
+    clearBtn.classList.add('hidden');
+  }
+  
+  renderGallery();
+}
+
+function clearSearch() {
+  const searchInput = document.getElementById('gallery-search');
+  searchInput.value = '';
+  state.gallerySearch = '';
+  document.getElementById('search-clear-btn').classList.add('hidden');
+  renderGallery();
+}
+
+function setGalleryFilter(filterType) {
+  state.galleryFilter = filterType;
+  
+  // Update active buttons class
+  document.querySelectorAll('.btn-filter').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  
+  if (filterType === 'all') {
+    document.getElementById('filter-btn-all').classList.add('active');
+  } else if (filterType === 'enhanced') {
+    document.getElementById('filter-btn-enhanced').classList.add('active');
+  } else if (filterType === 'unprocessed') {
+    document.getElementById('filter-btn-unprocessed').classList.add('active');
+  }
+  
+  renderGallery();
+}
+
+// ==========================================================================
+// Card Checkboxes & Bulk Operations Management
+// ==========================================================================
+function handleImageSelect(id, isChecked) {
+  if (isChecked) {
+    if (!state.selectedImageIds.includes(id)) {
+      state.selectedImageIds.push(id);
+    }
+    const card = document.querySelector(`.image-card[data-id="${id}"]`);
+    if (card) card.classList.add('selected');
+  } else {
+    state.selectedImageIds = state.selectedImageIds.filter(x => x !== id);
+    const card = document.querySelector(`.image-card[data-id="${id}"]`);
+    if (card) card.classList.remove('selected');
+  }
+  
+  updateBulkActionsToolbar();
+}
+
+function updateBulkActionsToolbar() {
+  const toolbar = document.getElementById('bulk-actions-toolbar');
+  const countLabel = document.getElementById('selected-count-label');
+  const selectAllBtn = document.getElementById('bulk-select-all-btn');
+  
+  if (state.selectedImageIds.length > 0) {
+    toolbar.classList.remove('hidden');
+    countLabel.textContent = `${state.selectedImageIds.length} seleccionada${state.selectedImageIds.length > 1 ? 's' : ''}`;
+    
+    // Get visible images
+    const visibleImages = state.images.filter(img => {
+      if (state.galleryFilter === 'enhanced' && img.status !== 'enhanced') return false;
+      if (state.galleryFilter === 'unprocessed' && img.status === 'enhanced') return false;
+      if (state.gallerySearch.trim() !== '') {
+        const q = state.gallerySearch.toLowerCase().trim();
+        const nameMatch = img.original_name.toLowerCase().includes(q);
+        let analysisMatch = false;
+        if (img.ai_analysis) {
+          const desc = (img.ai_analysis.description || '').toLowerCase();
+          const explanation = (img.ai_analysis.explanation || '').toLowerCase();
+          const flaws = Array.isArray(img.ai_analysis.flaws) ? img.ai_analysis.flaws.join(' ').toLowerCase() : '';
+          analysisMatch = desc.includes(q) || explanation.includes(q) || flaws.includes(q);
+        }
+        return nameMatch || analysisMatch;
+      }
+      return true;
+    });
+    
+    const visibleIds = visibleImages.map(img => img.id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => state.selectedImageIds.includes(id));
+    
+    if (allVisibleSelected) {
+      selectAllBtn.innerHTML = '<i class="fa-solid fa-square-minus"></i> Deseleccionar todas';
+    } else {
+      selectAllBtn.innerHTML = '<i class="fa-solid fa-square-check"></i> Seleccionar todas';
+    }
+  } else {
+    toolbar.classList.add('hidden');
+  }
+}
+
+function clearSelectedImages() {
+  state.selectedImageIds = [];
+  renderGallery();
+}
+
+function toggleSelectAllImages() {
+  const visibleImages = state.images.filter(img => {
+    if (state.galleryFilter === 'enhanced' && img.status !== 'enhanced') return false;
+    if (state.galleryFilter === 'unprocessed' && img.status === 'enhanced') return false;
+    if (state.gallerySearch.trim() !== '') {
+      const q = state.gallerySearch.toLowerCase().trim();
+      const nameMatch = img.original_name.toLowerCase().includes(q);
+      let analysisMatch = false;
+      if (img.ai_analysis) {
+        const desc = (img.ai_analysis.description || '').toLowerCase();
+        const explanation = (img.ai_analysis.explanation || '').toLowerCase();
+        const flaws = Array.isArray(img.ai_analysis.flaws) ? img.ai_analysis.flaws.join(' ').toLowerCase() : '';
+        analysisMatch = desc.includes(q) || explanation.includes(q) || flaws.includes(q);
+      }
+      return nameMatch || analysisMatch;
+    }
+    return true;
+  });
+
+  const visibleIds = visibleImages.map(img => img.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => state.selectedImageIds.includes(id));
+
+  if (allVisibleSelected) {
+    state.selectedImageIds = state.selectedImageIds.filter(id => !visibleIds.includes(id));
+  } else {
+    visibleIds.forEach(id => {
+      if (!state.selectedImageIds.includes(id)) {
+        state.selectedImageIds.push(id);
+      }
+    });
+  }
+
+  renderGallery();
+}
+
+// Progress Overlays
+function showProgressOverlay(title, subtitle, percent = 0) {
+  document.getElementById('progress-title').textContent = title;
+  document.getElementById('progress-subtitle').textContent = subtitle;
+  document.getElementById('progress-bar-fill').style.width = `${percent}%`;
+  document.getElementById('progress-percent').textContent = `${Math.round(percent)}%`;
+  document.getElementById('progress-overlay').classList.remove('hidden');
+}
+
+function updateProgress(subtitle, percent) {
+  document.getElementById('progress-subtitle').textContent = subtitle;
+  document.getElementById('progress-bar-fill').style.width = `${percent}%`;
+  document.getElementById('progress-percent').textContent = `${Math.round(percent)}%`;
+}
+
+function hideProgressOverlay() {
+  document.getElementById('progress-overlay').classList.add('hidden');
+}
+
+// Sequential processing for batch operations
+async function startBulkAnalysis() {
+  const ids = [...state.selectedImageIds];
+  if (ids.length === 0) return;
+
+  const total = ids.length;
+  showProgressOverlay('Analizando imágenes con IA', `Preparando... (0/${total})`, 0);
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (let i = 0; i < total; i++) {
+    const id = ids[i];
+    const image = state.images.find(img => img.id === id);
+    const name = image ? image.original_name : `Imagen #${id}`;
+    
+    updateProgress(`Analizando (${i + 1}/${total}): ${name}`, (i / total) * 100);
+
+    try {
+      const payload = selectedAIModel ? { model: selectedAIModel } : {};
+      const res = await fetch(`/api/images/${id}/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error desconocido.');
+      }
+      
+      successCount++;
+    } catch (err) {
+      console.error(`Error al analizar imagen #${id}:`, err);
+      failCount++;
+    }
+  }
+
+  updateProgress('Completado', 100);
+  
+  setTimeout(async () => {
+    hideProgressOverlay();
+    state.selectedImageIds = [];
+    showToast(`Análisis por lote completo. Éxitos: ${successCount}. Fallos: ${failCount}.`, successCount > 0 ? 'success' : 'error');
+    await loadImages();
+  }, 1000);
+}
+
+async function startBulkOptimization() {
+  const ids = [...state.selectedImageIds];
+  if (ids.length === 0) return;
+
+  const total = ids.length;
+  showProgressOverlay('Optimizando imágenes con Sharp', `Preparando... (0/${total})`, 0);
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (let i = 0; i < total; i++) {
+    const id = ids[i];
+    const image = state.images.find(img => img.id === id);
+    const name = image ? image.original_name : `Imagen #${id}`;
+    
+    updateProgress(`Optimizando (${i + 1}/${total}): ${name}`, (i / total) * 100);
+
+    try {
+      const res = await fetch(`/api/images/${id}/enhance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error desconocido.');
+      }
+      
+      successCount++;
+    } catch (err) {
+      console.error(`Error al optimizar imagen #${id}:`, err);
+      failCount++;
+    }
+  }
+
+  updateProgress('Completado', 100);
+  
+  setTimeout(async () => {
+    hideProgressOverlay();
+    state.selectedImageIds = [];
+    showToast(`Optimización por lote completa. Éxitos: ${successCount}. Fallos: ${failCount}.`, successCount > 0 ? 'success' : 'error');
+    await loadImages();
+  }, 1000);
 }
 
 // ==========================================================================

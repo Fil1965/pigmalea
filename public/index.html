@@ -131,6 +131,45 @@
             </button>
           </div>
 
+          <!-- Gallery Controls (Search & Filter) -->
+          <div class="gallery-controls">
+            <!-- Search bar -->
+            <div class="search-box">
+              <i class="fa-solid fa-magnifying-glass search-icon"></i>
+              <input type="text" id="gallery-search" placeholder="Buscar por descripción o fallo..." oninput="handleSearch(this.value)">
+              <button id="search-clear-btn" class="search-clear-btn hidden" onclick="clearSearch()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <!-- Filters -->
+            <div class="filter-controls">
+              <button id="filter-btn-all" class="btn btn-filter active" onclick="setGalleryFilter('all')">Todas</button>
+              <button id="filter-btn-enhanced" class="btn btn-filter" onclick="setGalleryFilter('enhanced')">Optimadas</button>
+              <button id="filter-btn-unprocessed" class="btn btn-filter" onclick="setGalleryFilter('unprocessed')">Sin optimizar</button>
+            </div>
+          </div>
+
+          <!-- Bulk Actions Toolbar -->
+          <div id="bulk-actions-toolbar" class="bulk-actions-toolbar hidden">
+            <div class="bulk-info">
+              <i class="fa-solid fa-list-check"></i>
+              <span id="selected-count-label">0 seleccionadas</span>
+            </div>
+            <div class="bulk-buttons">
+              <button class="btn btn-secondary btn-sm" onclick="toggleSelectAllImages()" id="bulk-select-all-btn">
+                <i class="fa-solid fa-square-check"></i> Seleccionar todas
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="startBulkAnalysis()">
+                <i class="fa-solid fa-brain"></i> Analizar con IA
+              </button>
+              <button class="btn btn-success btn-sm" onclick="startBulkOptimization()">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Optimizar
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="clearSelectedImages()">
+                Cancelar
+              </button>
+            </div>
+          </div>
+
           <!-- Empty State -->
           <div id="gallery-empty" class="empty-state hidden">
             <div class="empty-icon"><i class="fa-regular fa-image"></i></div>
@@ -407,6 +446,21 @@
     <div class="toast-content">
       <i class="fa-solid fa-circle-exclamation toast-icon"></i>
       <span id="toast-message">Mensaje de alerta</span>
+    </div>
+  </div>
+
+  <!-- Bulk Action Progress Overlay -->
+  <div id="progress-overlay" class="progress-overlay hidden">
+    <div class="progress-card">
+      <div class="spinner-container" style="padding: 10px 0;">
+        <div class="spinner"></div>
+      </div>
+      <h3 id="progress-title">Procesando lote...</h3>
+      <p id="progress-subtitle">Por favor, espera.</p>
+      <div class="progress-bar-container">
+        <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+      </div>
+      <span id="progress-percent">0%</span>
     </div>
   </div>
 
