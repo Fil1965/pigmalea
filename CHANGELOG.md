@@ -4,7 +4,9 @@ All notable changes to the Pigmalea project will be documented in this file.
 
 ---
 
-## [Unreleased] - 2026-06-22
+## [Unreleased]
+
+## [1.1.0] - 2026-06-22
 
 ### Added
 - **Preprocesamiento de Imágenes con Sharp (`ollama.mjs`):** Antes de enviar una imagen a Ollama, se normaliza la orientación EXIF, se redimensiona a un máximo de `1024x1024` y se comprime como JPEG calidad `80` para acelerar la inferencia y reducir el tamaño de payload.
