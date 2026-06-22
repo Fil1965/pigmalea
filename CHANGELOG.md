@@ -11,6 +11,7 @@ All notable changes to the Pigmalea project will be documented in this file.
 - **Balance de Blancos (`imageProcessor.mjs`):** Nuevos ajustes de `temperature` y `tint` aplicados en espacio de color lineal (`scrgb`) mediante `.recomb()` para corregir dominantes cálidas/frías y verdes/magentas.
 - **Rotación Manual y EXIF (`imageProcessor.mjs`, frontend):** Añadido parámetro `rotate` (0/90/180/270) y auto-rotación basada en metadatos EXIF antes del procesamiento.
 - **Selector de Modelo de Visión (`server.mjs`, `public/app.js`):** Nueva ruta `GET /api/info/model` y desplegable en el workspace para elegir manualmente entre los modelos de visión instalados en Ollama. El modelo elegido se guarda en `localStorage`.
+- **Indicador de Versión en la UI (`server.mjs`, `public/index.html`, `public/app.js`):** Nueva ruta `GET /api/info/version` y badge junto al nombre "Pigmalea" en la barra lateral, mostrando la versión de `package.json`.
 - **Utilidad de Liberación de Puerto (`kill-server.mjs`):** Script multiplataforma para terminar procesos que escuchan en el puerto configurado (`PORT`).
 - **Lista de Modelos Verificados (`working-models.json`):** Archivo generado automáticamente por el suite de tests con los modelos de Ollama que completan el análisis con éxito; `ollama.mjs` la utiliza para filtrar modelos confiables.
 

@@ -174,6 +174,17 @@ fastify.get('/api/info/model', async (request, reply) => {
   }
 });
 
+// GET /api/info/version (retrieve the application version from package.json)
+fastify.get('/api/info/version', async (request, reply) => {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+    return { version: pkg.version || '0.0.0' };
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send({ error: 'Error al obtener la versión de la aplicación.' });
+  }
+});
+
 
 // -------------------------------------------------------------
 // Protected Image Endpoints

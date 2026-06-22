@@ -97,6 +97,7 @@ Pigmalea/
 
 ### Información del Sistema
 *   `GET /api/info/model` - Devuelve el modelo de visión activo y la lista de modelos de visión instalados en Ollama.
+*   `GET /api/info/version` - Devuelve la versión de la aplicación definida en `package.json`.
 
 ### Gestión de Imágenes (Requieren autenticación)
 *   `GET /api/images` - Obtiene todas las imágenes subidas por el usuario logueado.

@@ -26,6 +26,7 @@ const DEFAULT_ADJUSTMENTS = {
 // Initialization & Session Check
 // ==========================================================================
 document.addEventListener('DOMContentLoaded', () => {
+  loadAppVersion();
   checkSession();
   initDragAndDrop();
   initSliderDrag();
@@ -669,6 +670,20 @@ function showToast(message, type = 'error') {
 
 let activeModelName = 'Llama 3.2 Vision';
 let selectedAIModel = null;
+
+async function loadAppVersion() {
+  try {
+    const res = await fetch('/api/info/version');
+    if (!res.ok) return;
+    const data = await res.json();
+    const versionEl = document.getElementById('brand-version');
+    if (versionEl && data.version) {
+      versionEl.textContent = `v${data.version}`;
+    }
+  } catch (err) {
+    console.error('Failed to load app version:', err);
+  }
+}
 
 async function fetchActiveModel() {
   try {
