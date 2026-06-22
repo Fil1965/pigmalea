@@ -361,7 +361,9 @@ fastify.post('/api/images/:id/enhance', { preHandler: requireAuth }, async (requ
       sharpness: userAdjustments.sharpness !== undefined ? parseFloat(userAdjustments.sharpness) : (aiAdjustments.sharpness !== undefined ? parseFloat(aiAdjustments.sharpness) : 0),
       denoise: userAdjustments.denoise !== undefined ? !!userAdjustments.denoise : (aiAdjustments.denoise !== undefined ? !!aiAdjustments.denoise : false),
       upscale: userAdjustments.upscale !== undefined ? !!userAdjustments.upscale : (aiAdjustments.upscale !== undefined ? !!aiAdjustments.upscale : false),
-      rotate: userAdjustments.rotate !== undefined ? parseInt(userAdjustments.rotate) : (aiAdjustments.rotate !== undefined ? parseInt(aiAdjustments.rotate) : 0)
+      rotate: userAdjustments.rotate !== undefined ? parseInt(userAdjustments.rotate) : (aiAdjustments.rotate !== undefined ? parseInt(aiAdjustments.rotate) : 0),
+      temperature: userAdjustments.temperature !== undefined ? parseFloat(userAdjustments.temperature) : (aiAdjustments.temperature !== undefined ? parseFloat(aiAdjustments.temperature) : 1.0),
+      tint: userAdjustments.tint !== undefined ? parseFloat(userAdjustments.tint) : (aiAdjustments.tint !== undefined ? parseFloat(aiAdjustments.tint) : 1.0)
     };
 
     const ext = path.extname(image.filename) || '.jpg';

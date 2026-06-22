@@ -42,6 +42,36 @@ test('Ollama Models Analysis and Enhancement Test Suite', async (t) => {
     assert.fail(`Failed to fetch models from Ollama: ${err.message}`);
   }
 
+  // Parse target model from command line arguments or environment variable
+  let targetModel = process.env.MODEL || null;
+  if (!targetModel) {
+    const modelFlagIndex = process.argv.findIndex(arg => arg === '--model' || arg === '-m');
+    if (modelFlagIndex !== -1 && process.argv[modelFlagIndex + 1]) {
+      targetModel = process.argv[modelFlagIndex + 1];
+    } else {
+      // Look for any positional argument that is not the node executable, --test, or the test runner files, and doesn't start with '-'
+      const possibleArgs = process.argv.slice(2).filter(arg => {
+        if (arg.startsWith('-')) return false;
+        if (arg.endsWith('ollama-models.test.mjs')) return false;
+        return true;
+      });
+      if (possibleArgs.length > 0) {
+        targetModel = possibleArgs[0];
+      }
+    }
+  }
+
+  if (targetModel) {
+    const matchedModels = models.filter(m => m.toLowerCase() === targetModel.toLowerCase() || m.toLowerCase().includes(targetModel.toLowerCase()));
+    if (matchedModels.length > 0) {
+      models = matchedModels;
+      console.log(`Filtering tests to run only for model(s): ${models.join(', ')}`);
+    } else {
+      models = [targetModel];
+      console.log(`Model "${targetModel}" not found in local Ollama list, but will attempt to test it anyway.`);
+    }
+  }
+
   if (models.length === 0) {
     console.warn('No models found in Ollama to test.');
     return;
@@ -64,13 +94,15 @@ test('Ollama Models Analysis and Enhancement Test Suite', async (t) => {
         console.log(`\n==================================================`);
         console.log(`Testing model [${model}] with ${testImagePath}...`);
         
-        // Call the image analysis helper
-        analysis = await analyzeImage(testImagePath, model);
+        // Call the image analysis helper with keepAlive = 0 to avoid VRAM congestion
+        analysis = await analyzeImage(testImagePath, model, 0);
         
         // Assert basic schema validity
         assert.ok(analysis, 'Analysis response should not be null');
         assert.ok(analysis.description, 'Analysis should contain a description field');
         assert.ok(analysis.adjustments, 'Analysis should contain adjustments parameters');
+        assert.ok(analysis.adjustments.temperature !== undefined, 'Analysis adjustments should contain temperature parameter');
+        assert.ok(analysis.adjustments.tint !== undefined, 'Analysis adjustments should contain tint parameter');
         assert.ok(analysis.explanation, 'Analysis should contain an explanation field');
         
         success = true;

@@ -2,55 +2,55 @@
 
 This report lists the results of running image analysis on each Ollama model available in the system using the test image `tests/test.jpg`.
 
-*Report updated on: 22/6/2026, 17:32:06*
+*Report generated on: 22/6/2026, 18:16:17*
 
 ## Execution Statistics
 - **Total Models Evaluated**: 14
-- **Successful Vision Analyses**: 8
-- **Failed/Unsupported Models**: 6
-- **Total Suite Execution Time**: 668.51s
+- **Successful Vision Analyses**: 6
+- **Failed/Unsupported Models**: 8
+- **Total Suite Execution Time**: 444.89s
 
 ## Model Performance Overview
 
 | Model | Status | Execution Time (s) | Description Summary / Error |
 | :--- | :--- | :--- | :--- |
-| **kimi-k2.7-code:cloud** | ✅ Success | 6.59s | A terracotta triple-pot planter with succulents sits on brown tiled flooring against a white wall with a brown baseboard. A timestamp is visible in the bottom-left corner. |
-| **llava:latest** | ✅ Success | 45.41s | The image shows a potted plant with various succulents, placed on a tiled floor indoors. The lighting is artificial and appears to be coming from above, casting shadows on the tiles. There are no people or moving objects in the scene. |
-| **minicpm-v4.6:latest** | ✅ Success | 40.51s | The image shows a decorative plant arrangement with terracotta pots on a tiled floor, featuring succulent-like plants with varying leaf textures. The scene appears slightly soft and lacks strong contrast. |
-| **minimax-m3:cloud** | ✅ Success | 11.02s | A multi-tiered terracotta pot arrangement containing various succulents (including a rosette-shaped echeveria and trailing varieties) placed on a brown tiled floor against a beige wall, likely on a balcony or patio. A date stamp '2026/01/30 13:11:51' appears in the lower left corner. |
-| **qwen3-vl:2b** | ✅ Success | 106.95s | A collection of succulent plants arranged in terracotta pots on a tiled surface with a white wall in the background. |
-| **qwen3-vl:4b** | ✅ Success | 148.17s | A terracotta pot arrangement with multiple succulents placed on a tiled floor against a white wall. |
+| **kimi-k2.7-code:cloud** | ✅ Success | 4.16s | A terracotta multi-pot planter with assorted succulents sits on a brown tiled floor against a white wall. |
+| **llava:latest** | ✅ Success | 20.09s | The image shows a potted plant with various succulents, placed on a tiled floor indoors. The lighting appears to be artificial and somewhat dim, casting soft shadows on the tiles. There is no text present in the image. |
+| **minicpm-v4.6:latest** | ✅ Success | 17.78s | The image depicts potted succulents in terracotta pots on a tray, placed on tiled flooring against a white wall, showing signs of low contrast and blur. |
+| **qwen3-vl:2b** | ✅ Success | 42.08s | A terracotta pot arrangement with multiple succulents placed on a tiled floor against a white wall. |
 | **qwen3-vl:8b** | ✅ Success | 259.64s | A terracotta pot arrangement with succulent plants placed on a tiled surface against a wall. |
-| **qwen3.5:cloud** | ✅ Success | 25.65s | A cluster of three terracotta pots holding various succulent plants, placed on a brown tiled floor against a white wall. |
+| **qwen3.5:cloud** | ✅ Success | 23.70s | A cluster of small terracotta pots containing various succulents sitting on a reddish-brown tiled floor against a white wall. |
 | **deepseek-ocr:latest** | ❌ Failed/Unsupported | 22.75s | `AI output was not in the expected JSON format.` |
 | **deepseek-v4-pro:cloud** | ❌ Failed/Unsupported | 0.35s | `Ollama API responded with status 400: {"error":"this model does not support image input (ref: c8547643-4ef4-4ffa-b13f-eb00d172e518)"}` |
 | **glm-5.1:cloud** | ❌ Failed/Unsupported | 0.37s | `Ollama API responded with status 400: {"error":"this model does not support image input (ref: 9e95b9f6-4029-42e2-9962-91ef4f11d1ce)"}` |
-| **glm-5.2:cloud** | ❌ Failed/Unsupported | 0.36s | `Ollama API responded with status 400: {"error":"this model does not support image input (ref: c178c5f7-d72f-4f5f-9c76-92b54f6dbf2a)"}` |
+| **glm-5.2:cloud** | ❌ Failed/Unsupported | 0.11s | `Ollama API responded with status 401: {"error":"Unauthorized"}` |
+| **minimax-m3:cloud** | ❌ Failed/Unsupported | 0.11s | `Ollama API responded with status 401: {"error":"Unauthorized"}` |
 | **qwen3-coder:480b-cloud** | ❌ Failed/Unsupported | 0.38s | `Ollama API responded with status 400: {"error":"this model does not support image input (ref: bda69f89-e66c-4dc3-a0fe-513ab4f7eb78)"}` |
 | **qwen3-vl:235b-cloud** | ❌ Failed/Unsupported | 0.36s | `Ollama API responded with status 410: {"error":"qwen3-vl:235b was retired at 2026-06-16 00:00:00 -0700 PDT (ref: d64f40aa-56ea-44e6-8eab-530b2abae5d3)"}` |
+| **qwen3-vl:4b** | ❌ Failed/Unsupported | 53.01s | `Ollama returned an empty response.` |
 
 ## Detailed Model Enhancements
 
 ### Model: `kimi-k2.7-code:cloud`
 
 - **Status**: ✅ Success
-- **Time Taken**: 6.59 seconds
-- **Explanation**: *The image is low-resolution, hazy, and lacks contrast and color vibrancy. Slightly reducing brightness while boosting contrast and saturation will restore depth, sharpening will improve detail, and denoising/upscaling will address the low-quality capture.*
+- **Time Taken**: 4.16 seconds
+- **Explanation**: *Increasing contrast and saturation will restore depth and color to the washed-out succulents and terracotta, while a moderate sharpness boost and upscaling will help compensate for the low-resolution blur.*
 - **Adjustments Applied**:
   ```json
 {
-  "brightness": -0.1,
-  "contrast": 1.4,
-  "saturation": 1.3,
-  "sharpness": 2.5,
-  "denoise": true,
+  "brightness": -0.05,
+  "contrast": 1.25,
+  "saturation": 1.2,
+  "sharpness": 1.5,
+  "denoise": false,
   "upscale": true,
   "rotate": 0
 }
   ```
 
 #### Analysis Details
-> A terracotta triple-pot planter with succulents sits on brown tiled flooring against a white wall with a brown baseboard. A timestamp is visible in the bottom-left corner.
+> A terracotta multi-pot planter with assorted succulents sits on a brown tiled floor against a white wall.
 
 #### Visual Enhancement Output
 ![Enhanced Image for kimi-k2.7-code-cloud](./kimi_k2_7_code_cloud_enhanced.jpg)
@@ -60,8 +60,8 @@ This report lists the results of running image analysis on each Ollama model ava
 ### Model: `llava:latest`
 
 - **Status**: ✅ Success
-- **Time Taken**: 45.41 seconds
-- **Explanation**: *To enhance the image, a moderate increase in brightness and contrast would help to make the details of the plant more visible. A slight sharpening could also improve the clarity of the succulents. Since the image is already quite saturated, no adjustment is needed for saturation. The denoise feature should be applied to reduce any noise present in the image. Upscaling would not be beneficial as it would introduce more artifacts due to the low resolution. There is no need to rotate the image.*
+- **Time Taken**: 20.09 seconds
+- **Explanation**: *The image is dimly lit and lacks contrast, which can be improved by increasing the brightness and contrast. The sharpness appears to be low due to the soft shadows cast on the tiles, so applying a sharpening filter would help define the details of the plant. Denoising the image could also improve its clarity. There is no need for upscaling or rotation adjustments as the image is already in a standard orientation and does not appear to be low resolution.*
 - **Adjustments Applied**:
   ```json
 {
@@ -71,12 +71,14 @@ This report lists the results of running image analysis on each Ollama model ava
   "sharpness": 2,
   "denoise": true,
   "upscale": false,
-  "rotate": 0
+  "rotate": 0,
+  "temperature": 1,
+  "tint": 1
 }
   ```
 
 #### Analysis Details
-> The image shows a potted plant with various succulents, placed on a tiled floor indoors. The lighting is artificial and appears to be coming from above, casting shadows on the tiles. There are no people or moving objects in the scene.
+> The image shows a potted plant with various succulents, placed on a tiled floor indoors. The lighting appears to be artificial and somewhat dim, casting soft shadows on the tiles. There is no text present in the image.
 
 #### Visual Enhancement Output
 ![Enhanced Image for llava-latest](./llava_latest_enhanced.jpg)
@@ -86,41 +88,15 @@ This report lists the results of running image analysis on each Ollama model ava
 ### Model: `minicpm-v4.6:latest`
 
 - **Status**: ✅ Success
-- **Time Taken**: 40.51 seconds
-- **Explanation**: *These adjustments will enhance visibility and detail by increasing brightness, contrast, saturation, and sharpness, while addressing the blur and low contrast issues.*
+- **Time Taken**: 17.78 seconds
+- **Explanation**: *These adjustments will enhance visibility and detail while reducing the blur, improving overall image quality.*
 - **Adjustments Applied**:
   ```json
 {
-  "brightness": 0.4,
+  "brightness": 0.3,
   "contrast": 1.5,
   "saturation": 1.2,
   "sharpness": 3,
-  "denoise": true,
-  "upscale": false,
-  "rotate": 0
-}
-  ```
-
-#### Analysis Details
-> The image shows a decorative plant arrangement with terracotta pots on a tiled floor, featuring succulent-like plants with varying leaf textures. The scene appears slightly soft and lacks strong contrast.
-
-#### Visual Enhancement Output
-![Enhanced Image for minicpm-v4.6-latest](./minicpm_v4_6_latest_enhanced.jpg)
-
----
-
-### Model: `minimax-m3:cloud`
-
-- **Status**: ✅ Success
-- **Time Taken**: 11.02 seconds
-- **Explanation**: *A modest brightness lift and contrast increase will restore depth lost in the flat lighting. Slight saturation boost will revive the muted greens of the succulents and warm terracotta tones. Mild sharpening will bring out leaf and petal details that are currently soft, while avoiding over-sharpening. Upscaling is recommended given the moderate native resolution. Denoise is not strictly needed since noise is minimal, and no rotation is required as the orientation is correct.*
-- **Adjustments Applied**:
-  ```json
-{
-  "brightness": 0.08,
-  "contrast": 1.15,
-  "saturation": 1.15,
-  "sharpness": 1.5,
   "denoise": false,
   "upscale": true,
   "rotate": 0
@@ -128,51 +104,25 @@ This report lists the results of running image analysis on each Ollama model ava
   ```
 
 #### Analysis Details
-> A multi-tiered terracotta pot arrangement containing various succulents (including a rosette-shaped echeveria and trailing varieties) placed on a brown tiled floor against a beige wall, likely on a balcony or patio. A date stamp '2026/01/30 13:11:51' appears in the lower left corner.
+> The image depicts potted succulents in terracotta pots on a tray, placed on tiled flooring against a white wall, showing signs of low contrast and blur.
 
 #### Visual Enhancement Output
-![Enhanced Image for minimax-m3-cloud](./minimax_m3_cloud_enhanced.jpg)
+![Enhanced Image for minicpm-v4.6-latest](./minicpm_v4_6_latest_enhanced.jpg)
 
 ---
 
 ### Model: `qwen3-vl:2b`
 
 - **Status**: ✅ Success
-- **Time Taken**: 106.95 seconds
-- **Explanation**: *The image is underexposed and blurry, so increasing brightness to enhance visibility, boosting contrast for better color separation, sharpening to reduce blur, and denoising to remove graininess.*
+- **Time Taken**: 42.08 seconds
+- **Explanation**: *The image is blurry and has noise; increasing sharpness to enhance clarity and denoising to reduce artifacts.*
 - **Adjustments Applied**:
   ```json
 {
   "brightness": 0.2,
-  "contrast": 1.5,
+  "contrast": 1.2,
   "saturation": 1,
   "sharpness": 3,
-  "denoise": true,
-  "upscale": true,
-  "rotate": 0
-}
-  ```
-
-#### Analysis Details
-> A collection of succulent plants arranged in terracotta pots on a tiled surface with a white wall in the background.
-
-#### Visual Enhancement Output
-![Enhanced Image for qwen3-vl-2b](./qwen3_vl_2b_enhanced.jpg)
-
----
-
-### Model: `qwen3-vl:4b`
-
-- **Status**: ✅ Success
-- **Time Taken**: 148.17 seconds
-- **Explanation**: *Adjusting brightness to enhance visibility, increasing contrast and saturation for vivid colors, applying moderate sharpening to reduce blurriness, denoising to remove compression artifacts, and upscaling to improve resolution.*
-- **Adjustments Applied**:
-  ```json
-{
-  "brightness": 0.1,
-  "contrast": 1.3,
-  "saturation": 1.2,
-  "sharpness": 0.5,
   "denoise": true,
   "upscale": true,
   "rotate": 0
@@ -183,7 +133,7 @@ This report lists the results of running image analysis on each Ollama model ava
 > A terracotta pot arrangement with multiple succulents placed on a tiled floor against a white wall.
 
 #### Visual Enhancement Output
-![Enhanced Image for qwen3-vl-4b](./qwen3_vl_4b_enhanced.jpg)
+![Enhanced Image for qwen3-vl-2b](./qwen3_vl_2b_enhanced.jpg)
 
 ---
 
@@ -216,13 +166,13 @@ This report lists the results of running image analysis on each Ollama model ava
 ### Model: `qwen3.5:cloud`
 
 - **Status**: ✅ Success
-- **Time Taken**: 25.65 seconds
-- **Explanation**: *The image appears flat and washed out due to low contrast. Increasing contrast and saturation will revitalize the colors of the plants and pots. Sharpening is needed to counteract the softness, and denoising will help clean up the graininess visible in the wall and floor.*
+- **Time Taken**: 23.70 seconds
+- **Explanation**: *The image appears washed out with low contrast, making the plants look pale. Increasing contrast and saturation will restore vibrancy to the succulents and pots. The image is soft and grainy, requiring sharpening and denoising to improve clarity and detail.*
 - **Adjustments Applied**:
   ```json
 {
-  "brightness": 0.1,
-  "contrast": 1.3,
+  "brightness": -0.1,
+  "contrast": 1.35,
   "saturation": 1.2,
   "sharpness": 2.5,
   "denoise": true,
@@ -232,7 +182,7 @@ This report lists the results of running image analysis on each Ollama model ava
   ```
 
 #### Analysis Details
-> A cluster of three terracotta pots holding various succulent plants, placed on a brown tiled floor against a white wall.
+> A cluster of small terracotta pots containing various succulents sitting on a reddish-brown tiled floor against a white wall.
 
 #### Visual Enhancement Output
 ![Enhanced Image for qwen3.5-cloud](./qwen3_5_cloud_enhanced.jpg)
@@ -269,9 +219,18 @@ This report lists the results of running image analysis on each Ollama model ava
 ### Model: `glm-5.2:cloud`
 
 - **Status**: ❌ Failed / Unsupported (No Vision)
-- **Time Taken**: 0.36 seconds
+- **Time Taken**: 0.11 seconds
 - **Failure/Error Message**:
-  > `Ollama API responded with status 400: {"error":"this model does not support image input (ref: c178c5f7-d72f-4f5f-9c76-92b54f6dbf2a)"}`
+  > `Ollama API responded with status 401: {"error":"Unauthorized"}`
+
+---
+
+### Model: `minimax-m3:cloud`
+
+- **Status**: ❌ Failed / Unsupported (No Vision)
+- **Time Taken**: 0.11 seconds
+- **Failure/Error Message**:
+  > `Ollama API responded with status 401: {"error":"Unauthorized"}`
 
 ---
 
@@ -290,6 +249,15 @@ This report lists the results of running image analysis on each Ollama model ava
 - **Time Taken**: 0.36 seconds
 - **Failure/Error Message**:
   > `Ollama API responded with status 410: {"error":"qwen3-vl:235b was retired at 2026-06-16 00:00:00 -0700 PDT (ref: d64f40aa-56ea-44e6-8eab-530b2abae5d3)"}`
+
+---
+
+### Model: `qwen3-vl:4b`
+
+- **Status**: ❌ Failed / Unsupported (No Vision)
+- **Time Taken**: 53.01 seconds
+- **Failure/Error Message**:
+  > `Ollama returned an empty response.`
 
 ---
 

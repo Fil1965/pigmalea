@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "README.md",
+                "file": "tests/results/summary.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "README"
+              "title": "summary"
             }
           }
         ]
@@ -185,19 +185,25 @@
   },
   "active": "008432f75c611327",
   "lastOpenFiles": [
-    "tests/results/qwen3_vl_4b_enhanced.jpg",
-    "tests/results/qwen3_5_cloud_enhanced.jpg",
-    "tests/results/minimax_m3_cloud_enhanced.jpg",
-    "tests/results/llava_latest_enhanced.jpg",
-    "tests/results/kimi_k2_7_code_cloud_enhanced.jpg",
+    "uploads/enhanced/1782144419630-637216902_enhanced_1782144940497.jpg",
+    "uploads/enhanced/1782144419600-640152330_enhanced_1782144735814.jpg",
+    "uploads/enhanced/1782144419611-24595550_enhanced_1782144629526.jpg",
+    "uploads/originals/1782144419835-468260073.jpg",
+    "uploads/originals/1782144419827-366032622.jpg",
+    "uploads/originals/1782144419819-108321790.jpg",
+    "uploads/originals/1782144419810-408814210.jpg",
+    "uploads/originals/1782144419800-456631684.jpg",
+    "uploads/originals/1782144419792-204423945.jpg",
+    "uploads/originals/1782144419673-557680789.jpg",
+    "uploads/originals/1782144419666-14418378.jpg",
+    "pigmalea.db-journal",
+    "tests/run-test.ps1",
+    "tests/README.md",
+    "README.md",
+    "tests/results/minicpm_v4_6_latest.json",
+    "tests/results/qwen3_vl_2b.json",
+    "tests/results/qwen3_vl_8b.json",
     "tests/results/summary.md",
-    "kill-server.mjs",
-    "uploads/enhanced/1782141181929-14615480_enhanced_1782141254887.jpg",
-    "uploads/enhanced/1782141181902-456447748_enhanced_1782141227209.jpg",
-    "uploads/enhanced/1782141181887-993141771_enhanced_1782141203178.jpg",
-    "uploads/originals/1782141181929-14615480.jpg",
-    "uploads/originals/1782141181902-456447748.jpg",
-    "uploads/originals/1782141181887-993141771.jpg",
-    "pigmalea.db-journal"
+    "kill-server.mjs"
   ]
 }

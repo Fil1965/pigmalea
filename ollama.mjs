@@ -158,7 +158,7 @@ export async function getAvailableVisionModel() {
  * @param {string} filePath - Absolute path to the image file.
  * @returns {Promise<Object>} The parsed JSON analysis from the AI.
  */
-export async function analyzeImage(filePath, selectedModel = null) {
+export async function analyzeImage(filePath, selectedModel = null, keepAlive = null) {
   try {
     // 1. Read file and convert to base64
     const fileBuffer = await fs.readFile(filePath);
@@ -174,7 +174,7 @@ You must return a JSON object. The response must follow this EXACT schema:
 {
   "description": "A concise description of the scene and main objects depicted.",
   "flaws": [
-    "List of visual quality issues found (e.g., 'low contrast', 'blurry', 'noise', 'chromatic aberration')"
+    "List of visual quality issues found (e.g., 'low contrast', 'blurry', 'noise', 'chromatic aberration', 'incorrect white balance')"
   ],
   "adjustments": {
     "brightness": 0.0,  // Suggested brightness modifier. Range: -0.5 to 0.5 (0.0 is no change)
@@ -183,7 +183,9 @@ You must return a JSON object. The response must follow this EXACT schema:
     "sharpness": 0.0,   // Suggested sharpening amount. Range: 0.0 to 5.0 (0.0 is no change)
     "denoise": false,   // Whether a denoise/blur operation is recommended
     "upscale": true,    // Whether upscaling is recommended
-    "rotate": 0         // Suggested rotation angle clockwise in degrees if the image is sideways or upside down. Allowed values: 0, 90, 180, 270 (0 is no change)
+    "rotate": 0,        // Suggested rotation angle clockwise in degrees if the image is sideways or upside down. Allowed values: 0, 90, 180, 270 (0 is no change)
+    "temperature": 1.0, // Suggested color temperature multiplier to correct white balance. Range: 0.5 to 1.5. (1.0 is no change, < 1.0 is cooler/blue, > 1.0 is warmer/orange)
+    "tint": 1.0         // Suggested color tint multiplier to correct green/magenta casts. Range: 0.5 to 1.5. (1.0 is no change, < 1.0 is magenta/purple cast correction, > 1.0 is green cast correction)
   },
   "explanation": "A very brief explanation of why you recommended these specific parameters."
 }
@@ -193,26 +195,32 @@ Do not include any text outside the JSON object. Do not include markdown code bl
     console.log(`Sending image ${filePath} to Ollama using model: ${activeModel}...`);
     
     // 4. Make HTTP request to local Ollama
+    const requestBody = {
+      model: activeModel,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+          images: [base64Image]
+        }
+      ],
+      options: {
+        temperature: 0.1
+      },
+      stream: false,
+      format: 'json'
+    };
+
+    if (keepAlive !== null) {
+      requestBody.keep_alive = keepAlive;
+    }
+
     const response = await fetch(`${OLLAMA_HOST}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        model: activeModel,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-            images: [base64Image]
-          }
-        ],
-        options: {
-          temperature: 0.1
-        },
-        stream: false,
-        format: 'json'
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
@@ -239,8 +247,17 @@ Do not include any text outside the JSON object. Do not include markdown code bl
           sharpness: 0.0,
           denoise: false,
           upscale: true,
-          rotate: 0
+          rotate: 0,
+          temperature: 1.0,
+          tint: 1.0
         };
+      } else {
+        if (parsedResult.adjustments.temperature === undefined) {
+          parsedResult.adjustments.temperature = 1.0;
+        }
+        if (parsedResult.adjustments.tint === undefined) {
+          parsedResult.adjustments.tint = 1.0;
+        }
       }
       return parsedResult;
     } catch (parseError) {

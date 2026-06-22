@@ -12,6 +12,8 @@ import fs from 'fs/promises';
  * @param {number} [options.sharpness=0] - Sharpness level (0.0 to 5.0)
  * @param {boolean} [options.denoise=false] - Whether to apply noise reduction
  * @param {boolean} [options.upscale=false] - Whether to upscale the image by 2x
+ * @param {number} [options.temperature=1.0] - Color temperature multiplier (0.5 to 1.5)
+ * @param {number} [options.tint=1.0] - Color tint multiplier (0.5 to 1.5)
  * @returns {Promise<Object>} Metadata of the enhanced image (width, height, size).
  */
 export async function enhanceImage(inputPath, outputPath, options = {}) {
@@ -22,11 +24,13 @@ export async function enhanceImage(inputPath, outputPath, options = {}) {
     sharpness = 0,
     denoise = false,
     upscale = false,
-    rotate = 0
+    rotate = 0,
+    temperature = 1.0,
+    tint = 1.0
   } = options;
 
   console.log(`Processing image: ${inputPath} -> ${outputPath}`);
-  console.log('Options applied:', { brightness, contrast, saturation, sharpness, denoise, upscale, rotate });
+  console.log('Options applied:', { brightness, contrast, saturation, sharpness, denoise, upscale, rotate, temperature, tint });
 
   try {
     let pipeline = sharp(inputPath);
@@ -80,6 +84,27 @@ export async function enhanceImage(inputPath, outputPath, options = {}) {
       const a = parseFloat(contrast);
       const b = 128 * (1.0 - a);
       pipeline = pipeline.linear(a, b);
+    }
+
+    // 7. White balance (temperature and tint) using recomb in linear space
+    const tempMultiplier = parseFloat(temperature !== undefined ? temperature : 1.0);
+    const tintMultiplier = parseFloat(tint !== undefined ? tint : 1.0);
+
+    if (tempMultiplier !== 1.0 || tintMultiplier !== 1.0) {
+      const rScale = tempMultiplier;
+      const gScale = tintMultiplier;
+      const bScale = tempMultiplier !== 0 ? (2.0 - tempMultiplier) : 1.0;
+
+      console.log(`Applying white balance: Red=${rScale.toFixed(2)}, Green=${gScale.toFixed(2)}, Blue=${bScale.toFixed(2)}`);
+
+      pipeline = pipeline
+        .pipelineColourspace('scrgb')
+        .recomb([
+          [rScale, 0, 0],
+          [0, gScale, 0],
+          [0, 0, bScale]
+        ])
+        .toColourspace('srgb');
     }
 
     // 7. Sharpening filter
