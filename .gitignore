@@ -9,6 +9,8 @@ package-lock.json
 # Database
 *.db
 pigmalea.db
+*.db-wal
+*.db-shm
 
 # User Uploads
 uploads/
@@ -17,3 +19,6 @@ uploads/
 tests/results/*.jpg
 tests/results/*.json
 !tests/results/summary.md
+
+# Obsidian
+.obsidian/
