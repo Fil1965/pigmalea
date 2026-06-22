@@ -524,17 +524,35 @@ async function startBulkOptimization() {
   const ids = [...state.selectedImageIds];
   if (ids.length === 0) return;
 
-  const total = ids.length;
+  // Only optimize images that already have AI analysis
+  const analyzableIds = [];
+  const skippedIds = [];
+
+  for (const id of ids) {
+    const image = state.images.find(img => img.id === id);
+    if (image && image.ai_analysis && image.ai_analysis.adjustments) {
+      analyzableIds.push(id);
+    } else {
+      skippedIds.push(image ? image.original_name : `Imagen #${id}`);
+    }
+  }
+
+  if (analyzableIds.length === 0) {
+    showToast('Ninguna imagen seleccionada tiene un análisis de IA previo. Analiza primero.', 'error');
+    return;
+  }
+
+  const total = analyzableIds.length;
   showProgressOverlay('Optimizando imágenes con Sharp', `Preparando... (0/${total})`, 0);
 
   let successCount = 0;
   let failCount = 0;
 
   for (let i = 0; i < total; i++) {
-    const id = ids[i];
+    const id = analyzableIds[i];
     const image = state.images.find(img => img.id === id);
     const name = image ? image.original_name : `Imagen #${id}`;
-    
+
     updateProgress(`Optimizando (${i + 1}/${total}): ${name}`, (i / total) * 100);
 
     try {
@@ -543,12 +561,12 @@ async function startBulkOptimization() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
       });
-      
+
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || 'Error desconocido.');
       }
-      
+
       successCount++;
     } catch (err) {
       console.error(`Error al optimizar imagen #${id}:`, err);
@@ -557,11 +575,15 @@ async function startBulkOptimization() {
   }
 
   updateProgress('Completado', 100);
-  
+
   setTimeout(async () => {
     hideProgressOverlay();
     state.selectedImageIds = [];
-    showToast(`Optimización por lote completa. Éxitos: ${successCount}. Fallos: ${failCount}.`, successCount > 0 ? 'success' : 'error');
+    const skippedMsg = skippedIds.length > 0
+      ? ` ${skippedIds.length} imagen(es) omitidas por no tener análisis previo.`
+      : '';
+    const type = successCount > 0 ? 'success' : 'error';
+    showToast(`Optimización por lote completa. Éxitos: ${successCount}. Fallos: ${failCount}.${skippedMsg}`, type);
     await loadImages();
   }, 1000);
 }

@@ -15,6 +15,9 @@ All notable changes to the Pigmalea project will be documented in this file.
 - **Selector de Modelo de Visión (`server.mjs`, `public/app.js`):** Nueva ruta `GET /api/info/model` y desplegable en el workspace para elegir manualmente entre los modelos de visión instalados en Ollama. El modelo elegido se guarda en `localStorage`.
 - **Indicador de Versión en la UI (`server.mjs`, `public/index.html`, `public/app.js`):** Nueva ruta `GET /api/info/version` y badge junto al nombre "Pigmalea" en la barra lateral, mostrando la versión de `package.json`.
 - **Ajuste Dinámico del Visor de Imágenes (`public/style.css`, `public/app.js`):** El contenedor de comparación ahora adopta la relación de aspecto de la foto cargada (con un límite para fotos muy verticales) y respeta `max-height: 78vh`, evitando que las imágenes verticales se vean diminutas con grandes bandas negras.
+
+### Changed
+- **Optimización por Lote (`public/app.js`):** `startBulkOptimization()` ahora exige que cada imagen seleccionada tenga un análisis de IA previo (`ai_analysis.adjustments`). Si ninguna imagen seleccionada cumple la condición, se aborta la acción con un mensaje informativo.
 - **Utilidad de Liberación de Puerto (`kill-server.mjs`):** Script multiplataforma para terminar procesos que escuchan en el puerto configurado (`PORT`).
 - **Lista de Modelos Verificados (`working-models.json`):** Archivo generado automáticamente por el suite de tests con los modelos de Ollama que completan el análisis con éxito; `ollama.mjs` la utiliza para filtrar modelos confiables.
 
