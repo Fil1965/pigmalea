@@ -1,0 +1,7 @@
+[
+  "kimi-k2.7-code:cloud",
+  "llava:latest",
+  "minimax-m3:cloud",
+  "qwen3-vl:4b",
+  "qwen3.5:cloud"
+]

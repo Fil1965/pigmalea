@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pigmalea | AI Image Enhancer</title>
+  <!-- Google Fonts: Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+  <!-- Glowing background blobs for glassmorphism -->
+  <div class="blob-container">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <div id="app" class="app-container">
+    <!-- AUTH VIEW -->
+    <div id="auth-view" class="view auth-card-container hidden">
+      <div class="auth-card">
+        <div class="auth-logo">
+          <div class="logo-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+          <h1>Pigmalea</h1>
+          <p>AI-Assisted Image Enhancer</p>
+        </div>
+
+        <!-- Tab switches -->
+        <div class="auth-tabs">
+          <button id="tab-login-btn" class="auth-tab active" onclick="switchAuthTab('login')">Entrar</button>
+          <button id="tab-register-btn" class="auth-tab" onclick="switchAuthTab('register')">Registrarse</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form" class="auth-form" onsubmit="handleAuth(event, 'login')">
+          <div class="form-group">
+            <label for="login-username">Usuario</label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-user"></i>
+              <input type="text" id="login-username" required placeholder="Tu usuario">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="login-password">Contraseña</label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-lock"></i>
+              <input type="password" id="login-password" required placeholder="Tu contraseña">
+            </div>
+          </div>
+          <button type="submit" id="login-submit-btn" class="btn btn-primary btn-block">
+            <span>Iniciar Sesión</span> <i class="fa-solid fa-arrow-right-to-bracket"></i>
+          </button>
+        </form>
+
+        <!-- Register Form -->
+        <form id="register-form" class="auth-form hidden" onsubmit="handleAuth(event, 'register')">
+          <div class="form-group">
+            <label for="register-username">Usuario</label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-user"></i>
+              <input type="text" id="register-username" required placeholder="Elige un usuario (mín. 3 caracteres)">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="register-password">Contraseña</label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-lock"></i>
+              <input type="password" id="register-password" required placeholder="Crea una contraseña (mín. 5 caracteres)">
+            </div>
+          </div>
+          <button type="submit" id="register-submit-btn" class="btn btn-primary btn-block">
+            <span>Crear Cuenta</span> <i class="fa-solid fa-user-plus"></i>
+          </button>
+        </form>
+
+        <div id="auth-error" class="alert alert-danger hidden"></div>
+      </div>
+    </div>
+
+    <!-- MAIN DASHBOARD VIEW -->
+    <div id="dashboard-view" class="view dashboard-container hidden">
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-logo"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+          <h2>Pigmalea</h2>
+        </div>
+
+        <nav class="nav-menu">
+          <a href="#" id="nav-gallery" class="nav-item active" onclick="navigateTo('gallery')">
+            <i class="fa-solid fa-images"></i> <span>Mis Fotos</span>
+          </a>
+          <a href="#" id="nav-upload" class="nav-item" onclick="navigateTo('upload')">
+            <i class="fa-solid fa-cloud-arrow-up"></i> <span>Subir Imagen</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="user-profile">
+            <div class="user-avatar"><i class="fa-solid fa-circle-user"></i></div>
+            <div class="user-info">
+              <span id="user-display-name" class="username">Usuario</span>
+              <span class="user-role">Creador</span>
+            </div>
+          </div>
+          <button class="btn btn-logout" onclick="handleLogout()" title="Cerrar Sesión">
+            <i class="fa-solid fa-power-off"></i>
+          </button>
+        </div>
+      </aside>
+
+      <!-- CONTENT PANELS -->
+      <main class="main-content">
+        <!-- GALLERY PANEL -->
+        <section id="panel-gallery" class="panel active">
+          <div class="panel-header">
+            <div>
+              <h1>Mis Fotos</h1>
+              <p>Colección de imágenes originales y sus versiones optimizadas por IA.</p>
+            </div>
+            <button class="btn btn-primary" onclick="navigateTo('upload')">
+              <i class="fa-solid fa-plus"></i> <span>Subir Nueva</span>
+            </button>
+          </div>
+
+          <!-- Empty State -->
+          <div id="gallery-empty" class="empty-state hidden">
+            <div class="empty-icon"><i class="fa-regular fa-image"></i></div>
+            <h3>No hay fotos todavía</h3>
+            <p>Sube tu primera imagen de baja resolución y deja que la IA obre su magia.</p>
+            <button class="btn btn-primary btn-sm" onclick="navigateTo('upload')">Subir ahora</button>
+          </div>
+
+          <!-- Images Grid -->
+          <div id="gallery-grid" class="image-grid"></div>
+        </section>
+
+        <!-- UPLOAD PANEL -->
+        <section id="panel-upload" class="panel">
+          <div class="panel-header">
+            <h1>Subir Imagen</h1>
+            <p>Sube imágenes de baja calidad, hechas con móviles antiguos o resoluciones reducidas.</p>
+          </div>
+
+          <div class="upload-zone" id="drop-zone">
+            <input type="file" id="file-input" accept="image/*" class="hidden" onchange="handleFileSelect(event)" multiple>
+            <div class="upload-prompt">
+              <div class="pulse-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+              <h3>Arrastra tu imagen aquí</h3>
+              <p>O si lo prefieres, haz clic para explorar tus archivos</p>
+              <span class="upload-limits">Formatos soportados: JPG, PNG, WEBP (Máx. 15MB)</span>
+            </div>
+          </div>
+
+          <!-- Upload Progress / Info Card -->
+          <div id="upload-status-card" class="upload-status-card hidden">
+            <div class="selected-file-info">
+              <div class="file-preview-thumbnail">
+                <img id="upload-thumbnail" src="" alt="Vista previa">
+              </div>
+              <div class="file-details">
+                <h4 id="upload-filename">nombre_archivo.jpg</h4>
+                <p id="upload-filesize">0 KB</p>
+              </div>
+            </div>
+
+            <div class="upload-actions">
+              <button class="btn btn-secondary" onclick="resetUploadZone()">Cancelar</button>
+              <button class="btn btn-success" id="start-upload-btn" onclick="performUpload()">
+                <span id="upload-btn-text">Subir Imagen</span> <i class="fa-solid fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- WORKSPACE PANEL (AI COMPARE & EDIT) -->
+        <section id="panel-workspace" class="panel">
+          <div class="workspace-header">
+            <button class="btn-back" onclick="navigateTo('gallery')">
+              <i class="fa-solid fa-arrow-left"></i> Volver a mis fotos
+            </button>
+            <h1 id="workspace-title">Mesa de Trabajo IA</h1>
+          </div>
+
+          <div class="workspace-layout">
+            <!-- Left Side: Interactive Compare Canvas -->
+            <div class="comparison-container">
+              <div class="comparison-card">
+                <!-- Visual comparison slider -->
+                <div id="image-slider-wrapper" class="slider-wrapper">
+                  <!-- Image Before (Original) -->
+                  <div class="image-before">
+                    <img id="img-original" src="" alt="Original">
+                    <span class="badge badge-before">Original</span>
+                  </div>
+
+                  <!-- Image After (Enhanced) -->
+                  <div class="image-after" id="image-after-container">
+                    <img id="img-enhanced" src="" alt="Mejorado">
+                    <span class="badge badge-after">Optimizado</span>
+                  </div>
+
+                  <!-- Drag Handle Bar -->
+                  <div class="slider-handle" id="slider-handle">
+                    <div class="handle-line"></div>
+                    <div class="handle-button">
+                      <i class="fa-solid fa-arrows-left-right"></i>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Fallback side-by-side if not enhanced yet -->
+                <div id="single-image-wrapper" class="single-wrapper">
+                  <img id="img-single" src="" alt="Original">
+                  <span class="badge badge-single">Original</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Side: AI Panel & Adjustments -->
+            <div class="workspace-sidebar">
+              <!-- AI Diagnostics Card -->
+              <div class="sidebar-card ai-info-card">
+                <div class="card-header">
+                  <h3><i class="fa-solid fa-brain"></i> Diagnóstico de la IA</h3>
+                </div>
+                <div class="card-body" id="ai-status-body">
+                  <!-- Dynamic Model Selection -->
+                  <div class="control-group model-select-group hidden" id="model-select-wrapper" style="margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
+                    <div class="control-label" style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+                      <i class="fa-solid fa-gears" style="color: var(--text-muted);"></i>
+                      <span>Modelo de Visión IA</span>
+                    </div>
+                    <select id="ai-model-select" class="select-dark" onchange="onModelSelectChange(this.value)">
+                      <!-- Options populated dynamically -->
+                    </select>
+                  </div>
+
+                  <!-- Analysis States -->
+                  <div id="ai-state-pending" class="ai-state-content">
+                    <p>La IA aún no ha analizado esta imagen. Solicita un diagnóstico para detectar fallos y obtener parámetros de mejora óptimos.</p>
+                    <button class="btn btn-primary btn-block btn-pulse" onclick="analyzeWithAI()">
+                      <i class="fa-solid fa-circle-nodes"></i> Analizar con <span class="ai-model-name">Llama 3.2 Vision</span>
+                    </button>
+                  </div>
+
+                  <div id="ai-state-loading" class="ai-state-content hidden">
+                    <div class="spinner-container">
+                      <div class="spinner"></div>
+                      <p><span class="ai-model-name">Llama 3.2 Vision</span> está analizando la imagen...</p>
+                      <small class="text-muted">(Esto puede tomar unos segundos la primera vez)</small>
+                    </div>
+                  </div>
+
+                  <div id="ai-state-completed" class="ai-state-content hidden">
+                    <div class="ai-report">
+                      <div class="report-item">
+                        <strong>Descripción:</strong>
+                        <p id="ai-report-description">...</p>
+                      </div>
+                      <div class="report-item">
+                        <strong>Fallos detectados:</strong>
+                        <ul id="ai-report-flaws" class="flaws-list"></ul>
+                      </div>
+                      <div class="report-item">
+                        <strong>Motivación:</strong>
+                        <p id="ai-report-explanation" class="explanation-text">...</p>
+                      </div>
+                    </div>
+                    <button class="btn btn-secondary btn-block btn-sm" onclick="analyzeWithAI()">
+                      <i class="fa-solid fa-rotate"></i> Re-analizar imagen
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Manual Adjustments Panel -->
+              <div class="sidebar-card adjustments-card">
+                <div class="card-header">
+                  <h3><i class="fa-solid fa-sliders"></i> Ajustes de Optimización</h3>
+                </div>
+                <div class="card-body">
+                  <!-- Brillo -->
+                  <div class="control-group">
+                    <div class="control-label">
+                      <span>Brillo</span>
+                      <span id="val-brightness">0.00</span>
+                    </div>
+                    <input type="range" id="slider-brightness" min="-0.5" max="0.5" step="0.05" value="0" oninput="updateSliderVal('brightness', this.value)">
+                  </div>
+
+                  <!-- Contraste -->
+                  <div class="control-group">
+                    <div class="control-label">
+                      <span>Contraste</span>
+                      <span id="val-contrast">1.00</span>
+                    </div>
+                    <input type="range" id="slider-contrast" min="0.5" max="2.0" step="0.05" value="1.0" oninput="updateSliderVal('contrast', this.value)">
+                  </div>
+
+                  <!-- Saturación -->
+                  <div class="control-group">
+                    <div class="control-label">
+                      <span>Saturación</span>
+                      <span id="val-saturation">1.00</span>
+                    </div>
+                    <input type="range" id="slider-saturation" min="0.0" max="2.0" step="0.05" value="1.0" oninput="updateSliderVal('saturation', this.value)">
+                  </div>
+
+                  <!-- Nitidez -->
+                  <div class="control-group">
+                    <div class="control-label">
+                      <span>Nitidez (Enfoque)</span>
+                      <span id="val-sharpness">0.00</span>
+                    </div>
+                    <input type="range" id="slider-sharpness" min="0.0" max="5.0" step="0.1" value="0" oninput="updateSliderVal('sharpness', this.value)">
+                  </div>
+
+                  <!-- Rotación -->
+                  <div class="control-group">
+                    <div class="control-label">
+                      <span>Rotar Imagen</span>
+                    </div>
+                    <select id="select-rotate" class="select-dark">
+                      <option value="0">Sin rotación (0°)</option>
+                      <option value="90">90° derecha (horario)</option>
+                      <option value="180">180° (girar de cabeza)</option>
+                      <option value="270">90° izquierda (antihorario)</option>
+                    </select>
+                  </div>
+
+                  <!-- Toggles -->
+                  <div class="toggle-row">
+                    <label class="toggle-control">
+                      <input type="checkbox" id="check-denoise">
+                      <span class="toggle-label">Reducir Ruido</span>
+                    </label>
+                    <label class="toggle-control">
+                      <input type="checkbox" id="check-upscale" checked>
+                      <span class="toggle-label">Súper-Resolución (2x)</span>
+                    </label>
+                  </div>
+
+                  <!-- Process Action -->
+                  <button class="btn btn-success btn-block btn-lg" id="enhance-btn" onclick="enhanceImage()">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Optimizar Imagen
+                  </button>
+                  <div id="enhance-loading" class="spinner-container hidden">
+                    <div class="spinner"></div>
+                    <p>Procesando imagen con Sharp...</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Metadata & Download Card -->
+              <div class="sidebar-card metadata-card hidden" id="meta-card">
+                <div class="card-header">
+                  <h3><i class="fa-solid fa-circle-info"></i> Detalles de Imagen</h3>
+                </div>
+                <div class="card-body">
+                  <div class="meta-info">
+                    <div class="meta-row"><span>Original:</span> <span id="meta-orig-res">0x0</span> (<span id="meta-orig-size">0 KB</span>)</div>
+                    <div class="meta-row" id="meta-enh-row"><span>Optimizado:</span> <span id="meta-enh-res">0x0</span> (<span id="meta-enh-size">0 KB</span>)</div>
+                  </div>
+                  <div class="download-buttons">
+                    <a id="btn-dl-original" href="#" download class="btn btn-secondary btn-sm"><i class="fa-solid fa-download"></i> Original</a>
+                    <a id="btn-dl-enhanced" href="#" download class="btn btn-primary btn-sm hidden"><i class="fa-solid fa-download"></i> Optimizado</a>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Global toast notifications -->
+  <div id="toast" class="toast hidden">
+    <div class="toast-content">
+      <i class="fa-solid fa-circle-exclamation toast-icon"></i>
+      <span id="toast-message">Mensaje de alerta</span>
+    </div>
+  </div>
+
+  <!-- Custom Script -->
+  <script src="app.js"></script>
+</body>
+</html>
