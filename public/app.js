@@ -101,6 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDragAndDrop();
   initSliderDrag();
   fetchActiveModel();
+  initLearningListeners();
 });
 
 // Check if user is logged in
@@ -908,15 +909,23 @@ function openWorkspace(imageId) {
   // Load AI details
   renderAIAnalysis(image.ai_analysis);
 
-  // Setup parameter sliders: prioritize applied manual adjustments, then AI recommendations, then neutral defaults
+  // Setup parameter sliders: prioritize applied manual adjustments, then user preferred adjustments, then AI recommendations, then neutral defaults
   let params = { ...DEFAULT_ADJUSTMENTS };
+  let usingLearning = false;
+
   if (image.applied_adjustments) {
     params = { ...params, ...image.applied_adjustments };
+  } else if (image.user_preferred_adjustments) {
+    params = { ...params, ...image.user_preferred_adjustments };
+    usingLearning = true;
   } else if (image.ai_analysis && image.ai_analysis.adjustments) {
     params = { ...params, ...image.ai_analysis.adjustments };
   }
   setSlidersValues(params);
   updatePasteButtonState();
+
+  // Actualizar visualización del banner y botones de aprendizaje
+  updateLearningUIState(image, usingLearning);
 
   navigateTo('workspace');
 }
@@ -978,20 +987,29 @@ async function analyzeWithAI() {
 
     state.currentImage.status = data.status;
     state.currentImage.ai_analysis = data.ai_analysis;
+    state.currentImage.user_preferred_adjustments = data.user_preferred_adjustments;
     
     // Update local state copy in state.images
     const cachedIdx = state.images.findIndex(img => img.id === state.currentImage.id);
     if (cachedIdx !== -1) {
       state.images[cachedIdx].status = data.status;
       state.images[cachedIdx].ai_analysis = data.ai_analysis;
+      state.images[cachedIdx].user_preferred_adjustments = data.user_preferred_adjustments;
     }
 
     renderAIAnalysis(data.ai_analysis);
     
-    // Auto populate sliders with recommendations
-    if (data.ai_analysis && data.ai_analysis.adjustments) {
-      setSlidersValues(data.ai_analysis.adjustments);
-      showToast('IA completada. Recomendaciones cargadas en los controles.', 'success');
+    // Auto populate sliders with user preferred adjustments (if available, else raw AI)
+    const targetAdj = data.user_preferred_adjustments || (data.ai_analysis && data.ai_analysis.adjustments);
+    if (targetAdj) {
+      setSlidersValues(targetAdj);
+      const loadedLearning = !!data.user_preferred_adjustments;
+      updateLearningUIState(state.currentImage, loadedLearning);
+      if (loadedLearning) {
+        showToast('IA completada. Ajustes adaptados según tus preferencias.', 'success');
+      } else {
+        showToast('IA completada. Recomendaciones cargadas en los controles.', 'success');
+      }
     }
   } catch (err) {
     showToast(err.message, 'error');
@@ -1069,31 +1087,36 @@ function setSlidersValues(adjustments) {
   const defaults = { ...DEFAULT_ADJUSTMENTS, ...adjustments };
 
   document.getElementById('slider-brightness').value = defaults.brightness;
-  updateSliderVal('brightness', defaults.brightness);
+  updateSliderVal('brightness', defaults.brightness, true);
 
   document.getElementById('slider-contrast').value = defaults.contrast;
-  updateSliderVal('contrast', defaults.contrast);
+  updateSliderVal('contrast', defaults.contrast, true);
 
   document.getElementById('slider-saturation').value = defaults.saturation;
-  updateSliderVal('saturation', defaults.saturation);
+  updateSliderVal('saturation', defaults.saturation, true);
 
   document.getElementById('slider-sharpness').value = defaults.sharpness;
-  updateSliderVal('sharpness', defaults.sharpness);
+  updateSliderVal('sharpness', defaults.sharpness, true);
 
   document.getElementById('slider-temperature').value = defaults.temperature;
-  updateSliderVal('temperature', defaults.temperature);
+  updateSliderVal('temperature', defaults.temperature, true);
 
   document.getElementById('slider-tint').value = defaults.tint;
-  updateSliderVal('tint', defaults.tint);
+  updateSliderVal('tint', defaults.tint, true);
 
   document.getElementById('check-denoise').checked = !!defaults.denoise;
   document.getElementById('check-upscale').checked = !!defaults.upscale;
   document.getElementById('select-rotate').value = defaults.rotate !== undefined ? defaults.rotate : 0;
 }
 
-function updateSliderVal(param, val) {
+function updateSliderVal(param, val, isProgrammatic = false) {
   const formattedVal = parseFloat(val).toFixed(2);
   document.getElementById(`val-${param}`).textContent = formattedVal;
+
+  if (!isProgrammatic) {
+    const banner = document.getElementById('learning-status-banner');
+    if (banner) banner.classList.add('hidden');
+  }
 }
 
 function copyCurrentAdjustments() {
@@ -1414,5 +1437,88 @@ async function copyImageToClipboard(imageUrl) {
     console.error('Failed to copy image:', err);
     showToast('Error al procesar la imagen para copiar.', 'error');
   }
+}
+
+function areAdjustmentsDifferent(adj1, adj2) {
+  if (!adj1 || !adj2) return false;
+  const keys = ['brightness', 'contrast', 'saturation', 'sharpness', 'temperature', 'tint', 'denoise', 'upscale'];
+  return keys.some(k => {
+    const val1 = adj1[k] !== undefined ? adj1[k] : DEFAULT_ADJUSTMENTS[k];
+    const val2 = adj2[k] !== undefined ? adj2[k] : DEFAULT_ADJUSTMENTS[k];
+    if (typeof val1 === 'number' && typeof val2 === 'number') {
+      return Math.abs(val1 - val2) > 0.009;
+    }
+    return val1 !== val2;
+  });
+}
+
+// ==========================================================================
+// User Preference Learning Handlers
+// ==========================================================================
+function updateLearningUIState(image, isApplyingLearningCurrently) {
+  const banner = document.getElementById('learning-status-banner');
+  const text = document.getElementById('learning-status-text');
+  const btnResetAi = document.getElementById('btn-reset-ai');
+  const btnApplyLearned = document.getElementById('btn-apply-learned');
+
+  if (!banner || !text || !btnResetAi || !btnApplyLearned) return;
+
+  if (!image || !image.ai_analysis) {
+    banner.classList.add('hidden');
+    btnResetAi.disabled = true;
+    btnApplyLearned.disabled = true;
+    return;
+  }
+
+  btnResetAi.disabled = false;
+
+  // Comprobar si hay ajustes preferidos guardados y si difieren de los de la IA bruta
+  const hasLearnedOffsets = image.user_preferred_adjustments && 
+    areAdjustmentsDifferent(image.user_preferred_adjustments, image.ai_analysis.adjustments);
+
+  if (hasLearnedOffsets) {
+    btnApplyLearned.disabled = false;
+    if (isApplyingLearningCurrently) {
+      banner.classList.remove('hidden');
+      
+      const count = image.user_preferred_adjustments.samplesCount || '';
+      const samplesText = count ? ` (aprendido de ${count} fotos)` : '';
+      text.textContent = `Ajustes adaptados según tus preferencias${samplesText}.`;
+    } else {
+      banner.classList.add('hidden');
+    }
+  } else {
+    btnApplyLearned.disabled = true;
+    banner.classList.add('hidden');
+  }
+}
+
+function resetToRawAI() {
+  if (!state.currentImage || !state.currentImage.ai_analysis || !state.currentImage.ai_analysis.adjustments) return;
+  setSlidersValues(state.currentImage.ai_analysis.adjustments);
+  updateLearningUIState(state.currentImage, false);
+  showToast('Restaurada sugerencia bruta de la IA.', 'success');
+}
+
+function applyLearnedAdjustments() {
+  if (!state.currentImage || !state.currentImage.user_preferred_adjustments) return;
+  setSlidersValues(state.currentImage.user_preferred_adjustments);
+  updateLearningUIState(state.currentImage, true);
+  showToast('Aplicados tus ajustes preferidos aprendidos.', 'success');
+}
+
+function initLearningListeners() {
+  const hideBanner = () => {
+    const banner = document.getElementById('learning-status-banner');
+    if (banner) banner.classList.add('hidden');
+  };
+
+  const denoise = document.getElementById('check-denoise');
+  const upscale = document.getElementById('check-upscale');
+  const rotate = document.getElementById('select-rotate');
+
+  if (denoise) denoise.addEventListener('change', hideBanner);
+  if (upscale) upscale.addEventListener('change', hideBanner);
+  if (rotate) rotate.addEventListener('change', hideBanner);
 }
 

@@ -15,6 +15,7 @@ import dotenv from 'dotenv';
 import { initDb, run, get, all, getFileHash } from './db.mjs';
 import { analyzeImage, getAvailableVisionModel, getInstalledVisionModels } from './ollama.mjs';
 import { enhanceImage, getImageMetadata } from './imageProcessor.mjs';
+import { calculatePreferencesProfile, getOffsetsFromProfile, applyLearnedOffsets, getLearnedOffsets } from './preferencesLearner.mjs';
 
 dotenv.config();
 
@@ -244,6 +245,13 @@ fastify.get('/api/images', { preHandler: requireAuth }, async (request, reply) =
       'SELECT id, filename, filepath, original_name, size, width, height, status, ai_analysis, applied_adjustments, enhanced_filename, created_at, captured_at, gps_latitude, gps_longitude, camera_make, camera_model, lens_model, fnumber, exposure_time, iso, focal_length, focal_length_35mm, flash, white_balance, software, artist FROM images WHERE user_id = ? ORDER BY created_at DESC',
       [request.session.userId]
     );
+
+    // Obtener historial de ediciones del usuario para calcular el perfil de aprendizaje
+    const editHistory = await all(
+      'SELECT ai_analysis, applied_adjustments, camera_model FROM images WHERE user_id = ? AND ai_analysis IS NOT NULL AND applied_adjustments IS NOT NULL',
+      [request.session.userId]
+    );
+    const learningProfile = calculatePreferencesProfile(editHistory);
     
     // Parse JSON strings to objects for frontend convenience
     const parsedImages = images.map(img => {
@@ -263,10 +271,19 @@ fastify.get('/api/images', { preHandler: requireAuth }, async (request, reply) =
           fastify.log.error('Error parsing stored applied adjustments JSON:', e);
         }
       }
+
+      // Aplicar offsets aprendidos si hay análisis de la IA disponible
+      let preferred = null;
+      if (analysis && analysis.adjustments) {
+        const offsets = getOffsetsFromProfile(learningProfile, img.camera_model);
+        preferred = applyLearnedOffsets(analysis.adjustments, offsets);
+      }
+
       return {
         ...img,
         ai_analysis: analysis,
         applied_adjustments: applied,
+        user_preferred_adjustments: preferred,
         original_url: `/uploads/originals/${img.filename}`,
         enhanced_url: img.enhanced_filename ? `/uploads/enhanced/${img.enhanced_filename}` : null
       };
@@ -444,9 +461,14 @@ fastify.post('/api/images/:id/analyze', { preHandler: requireAuth }, async (requ
       ['analyzed', stringifiedResult, imageId]
     );
 
+    // Calcular preferencias aprendidas
+    const offsets = await getLearnedOffsets(request.session.userId, image.camera_model);
+    const preferred = applyLearnedOffsets(analysisResult.adjustments, offsets);
+
     return {
       success: true,
       ai_analysis: analysisResult,
+      user_preferred_adjustments: preferred,
       status: 'analyzed'
     };
   } catch (err) {
@@ -477,17 +499,26 @@ fastify.post('/api/images/:id/enhance', { preHandler: requireAuth }, async (requ
       }
     }
 
-    // Merge parameters: prioritize request parameters, fallback to AI parameters, fallback to default neutral values
+    // Merge parameters: prioritize request parameters, fallback to user preferred adjustments, fallback to AI parameters, fallback to default neutral values
+    let targetAdjustments = {};
+    const hasUserParams = Object.keys(userAdjustments).length > 0;
+    if (hasUserParams) {
+      targetAdjustments = userAdjustments;
+    } else {
+      const offsets = await getLearnedOffsets(request.session.userId, image.camera_model);
+      targetAdjustments = applyLearnedOffsets(aiAdjustments, offsets);
+    }
+
     const options = {
-      brightness: userAdjustments.brightness !== undefined ? parseFloat(userAdjustments.brightness) : (aiAdjustments.brightness !== undefined ? parseFloat(aiAdjustments.brightness) : 0),
-      contrast: userAdjustments.contrast !== undefined ? parseFloat(userAdjustments.contrast) : (aiAdjustments.contrast !== undefined ? parseFloat(aiAdjustments.contrast) : 1.0),
-      saturation: userAdjustments.saturation !== undefined ? parseFloat(userAdjustments.saturation) : (aiAdjustments.saturation !== undefined ? parseFloat(aiAdjustments.saturation) : 1.0),
-      sharpness: userAdjustments.sharpness !== undefined ? parseFloat(userAdjustments.sharpness) : (aiAdjustments.sharpness !== undefined ? parseFloat(aiAdjustments.sharpness) : 0),
-      denoise: userAdjustments.denoise !== undefined ? !!userAdjustments.denoise : (aiAdjustments.denoise !== undefined ? !!aiAdjustments.denoise : false),
-      upscale: userAdjustments.upscale !== undefined ? !!userAdjustments.upscale : (aiAdjustments.upscale !== undefined ? !!aiAdjustments.upscale : false),
+      brightness: targetAdjustments.brightness !== undefined ? parseFloat(targetAdjustments.brightness) : 0,
+      contrast: targetAdjustments.contrast !== undefined ? parseFloat(targetAdjustments.contrast) : 1.0,
+      saturation: targetAdjustments.saturation !== undefined ? parseFloat(targetAdjustments.saturation) : 1.0,
+      sharpness: targetAdjustments.sharpness !== undefined ? parseFloat(targetAdjustments.sharpness) : 0,
+      denoise: targetAdjustments.denoise !== undefined ? !!targetAdjustments.denoise : false,
+      upscale: targetAdjustments.upscale !== undefined ? !!targetAdjustments.upscale : false,
       rotate: userAdjustments.rotate !== undefined ? parseInt(userAdjustments.rotate) : (aiAdjustments.rotate !== undefined ? parseInt(aiAdjustments.rotate) : 0),
-      temperature: userAdjustments.temperature !== undefined ? parseFloat(userAdjustments.temperature) : (aiAdjustments.temperature !== undefined ? parseFloat(aiAdjustments.temperature) : 1.0),
-      tint: userAdjustments.tint !== undefined ? parseFloat(userAdjustments.tint) : (aiAdjustments.tint !== undefined ? parseFloat(aiAdjustments.tint) : 1.0)
+      temperature: targetAdjustments.temperature !== undefined ? parseFloat(targetAdjustments.temperature) : 1.0,
+      tint: targetAdjustments.tint !== undefined ? parseFloat(targetAdjustments.tint) : 1.0
     };
 
     const ext = path.extname(image.filename) || '.jpg';

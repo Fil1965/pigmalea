@@ -231,6 +231,11 @@ export const initDb = async () => {
             }
           }
 
+          if (!camera_make && !camera_model) {
+            camera_make = 'Unknown';
+            camera_model = 'Unknown';
+          }
+
           db.prepare(`
             UPDATE images 
             SET captured_at = ?, gps_latitude = ?, gps_longitude = ?,

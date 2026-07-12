@@ -272,6 +272,14 @@
                   <h3><i class="fa-solid fa-sliders"></i> Ajustes de Optimización</h3>
                 </div>
                 <div class="card-body">
+                  <!-- Learning Status Banner -->
+                  <div id="learning-status-banner" class="learning-banner hidden">
+                    <div class="learning-banner-content">
+                      <i class="fa-solid fa-brain"></i>
+                      <span id="learning-status-text">Ajustes personalizados aplicados</span>
+                    </div>
+                  </div>
+
                   <!-- Copy/Paste Adjustments Toolbar -->
                   <div class="adjustments-toolbar" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
                     <button class="btn btn-secondary btn-sm" onclick="copyCurrentAdjustments()" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;" title="Copiar estos ajustes de optimización">
@@ -365,6 +373,14 @@
                   <button class="btn btn-success btn-block btn-lg" id="enhance-btn" onclick="enhanceImage()">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Optimizar Imagen
                   </button>
+                  <div class="learning-controls-toolbar" style="display: flex; gap: 10px; margin-top: 12px; margin-bottom: 8px;">
+                    <button class="btn btn-secondary btn-sm" id="btn-reset-ai" onclick="resetToRawAI()" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.85rem;" title="Restaurar a la sugerencia inicial de la IA" disabled>
+                      <i class="fa-solid fa-rotate-left"></i> Sugerencia IA
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="btn-apply-learned" onclick="applyLearnedAdjustments()" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.85rem;" title="Aplicar tus preferencias aprendidas del historial" disabled>
+                      <i class="fa-solid fa-brain"></i> Usar Aprendizaje
+                    </button>
+                  </div>
                   <div id="enhance-loading" class="spinner-container hidden">
                     <div class="spinner"></div>
                     <p>Procesando imagen con Sharp...</p>
