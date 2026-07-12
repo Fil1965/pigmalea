@@ -6,6 +6,67 @@ All notable changes to the Pigmalea project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-07-05
+
+### Added
+- **IA Sensible al EXIF (`ollama.mjs`):** El análisis de visión ahora inyecta en el prompt un bloque de contexto de captura (`EXIF`) con cámara, lente, apertura, obturación, ISO, focal y flash cuando estén disponibles.
+- **Reglas de Priorización Basadas en Captura:** Se añadieron instrucciones explícitas al prompt para que el modelo modere nitidez con ISO alto, trate con cuidado obturaciones lentas y priorice correcciones de temperatura/matiz cuando la captura lo sugiera.
+- **Builder Reutilizable de Contexto EXIF (`imageProcessor.mjs`):** Nuevo export `getExifContext(filePath)` para generar un contexto compacto y consistente que puede reutilizarse en futuros flujos de IA.
+
+## [1.4.3] - 2026-07-05
+
+### Added
+- **EXIF Técnico en la Mesa de Trabajo:** La tarjeta "Detalles de Imagen" muestra ahora un segundo bloque con los datos de cámara y exposición: marca/modelo del cuerpo, modelo de lente, apertura (f/N), velocidad de obturación (formateada como 1/Xs), ISO, focal (real + equivalente 35mm), flash y software. Cada fila aparece sólo si el EXIF de la foto contiene el dato.
+- **Lectura Extendida de EXIF (`imageProcessor.mjs`):** Se amplía `getImageMetadata()` para extraer `Make`, `Model`, `LensModel`, `FNumber`, `ExposureTime`, `ISO`, `FocalLength`, `FocalLengthIn35mmFormat`, `Flash`, `WhiteBalance`, `Software` y `Artist`, además de los campos ya existentes.
+- **Formateadores de EXIF (`public/app.js`):** Nuevas utilidades `formatExposureTime()`, `formatFNumber()`, `formatFocalLength()`, `formatFlash()` y `formatCamera()` para presentar los valores numéricos brutos como son legibles por un fotógrafo (p. ej. `f/1.8 · 1/120s · ISO 64 · 6.86mm (≈ 24mm)`).
+- **Columnas EXIF en BD (`db.mjs`):** Migración idempotente que añade 11 columnas nuevas a la tabla `images` y extiende el backfill de arranque para extraerlas de las fotos ya existentes.
+
+## [1.4.2] - 2026-07-05
+
+### Added
+- **Navegación al Workspace Simplificada:** Toda la tarjeta de vista previa de la imagen (`.card-preview`) ahora es clicable para abrir directamente la mesa de trabajo de optimización, mejorando sustancialmente la usabilidad y evitando tener que hacer clic específicamente sobre el botón flotante de edición.
+
+## [1.4.1] - 2026-07-05
+
+### Added
+- **Indicador EXIF en la Galería:** Añadido un pequeño icono de cámara (`📷`) en cada tarjeta de imagen de la galería para identificar visualmente a golpe de vista qué fotos ya subidas contienen información EXIF y cuáles no (ya que muchas imágenes no tienen metadatos originales de GPS o fecha).
+
+## [1.4.0] - 2026-07-05
+
+### Added
+- **Soporte de Lectura EXIF (Fecha y Ubicación):** Integración con la librería `exifr` para extraer automáticamente los metadatos de fecha/hora original de toma (`DateTimeOriginal`) y las coordenadas geográficas (latitud/longitud decimales) al subir imágenes.
+- **Acceso Directo a Google Maps:** Los metadatos de ubicación se muestran en la Mesa de Trabajo en el frontend con un enlace interactivo (`.map-link`) que abre las coordenadas GPS directamente en Google Maps.
+- **Pasada Inicial de Migración EXIF (Backfilling):** En el arranque del servidor, se realiza un proceso automático para recorrer las imágenes ya existentes en la base de datos que no hayan sido procesadas, extrayendo y registrando sus datos de fecha y geolocalización desde sus respectivos archivos originales en disco.
+
+## [1.3.1] - 2026-07-05
+
+### Fixed
+- **Persistencia de Ajustes Manuales:** Se añadió la columna `applied_adjustments` a la base de datos para almacenar permanentemente los ajustes exactos de Sharp utilizados al optimizar cada foto.
+- **Sincronización del Copiar/Pegar:** Al volver a abrir una imagen optimizada, los deslizadores y selectores de la Mesa de Trabajo ahora cargan los parámetros reales aplicados (en lugar de reiniciarse a los valores por defecto de la IA). Esto permite que el flujo de Copiar y Pegar ajustes funcione correctamente con fotos ya procesadas.
+
+## [1.3.0] - 2026-07-05
+
+### Added
+- **Copiar y Pegar Ajustes de Optimización:** Nueva barra de herramientas en la sección de Ajustes Manuales de la Mesa de Trabajo que permite copiar la combinación actual de parámetros (brillo, contraste, saturación, enfoque, temperatura, matiz, rotación, eliminación de ruido y súper-resolución) y pegarla en otra imagen de forma instantánea. Los ajustes copiados se guardan localmente en `localStorage` para persistir entre sesiones o recargas de página.
+
+## [1.2.1] - 2026-07-05
+
+### Changed
+- **Formateador de Logs de Consola:** Se configuró un flujo de salida personalizado (`customLoggerStream`) que transforma las líneas de logs JSON predeterminadas de Fastify/Pino en salidas estructuradas y legibles clásicas para el terminal (ej. `[Hora] [Nivel] mensaje`).
+- **Almacenamiento de Logs:** Los logs en su formato JSON original (para análisis automatizado) se guardan en el archivo físico `server.log`.
+
+## [1.2.0] - 2026-07-05
+
+### Added
+- **Detección de Duplicados en la Subida:** Se implementó el cálculo y guardado de hashes criptográficos (SHA-256) de las fotos subidas. Las fotos idénticas ya subidas por el usuario se rechazan durante el proceso de subida.
+- **Modal de Reporte de Duplicados:** Si se detectan imágenes duplicadas al subir (individualmente o en lote), se muestra un diálogo modal glassmorphic en el frontend listando los archivos omitidos.
+- **Recalculo de Hashes Retroactivo:** Proceso de migración automática en el arranque del servidor (`initDb()`) que añade la columna `hash` a la tabla `images` y calcula el hash de las imágenes existentes en disco.
+
+## [1.1.1] - 2026-07-05
+
+### Fixed
+- **Advertencias de Font Awesome:** Se actualizó el enlace CDN de Font Awesome de v6.4.0 a v6.6.0 para corregir advertencias en la consola del navegador sobre cajas de límites incorrectas de glifos (`Glyph bbox was incorrect`).
+
 ## [1.1.0] - 2026-06-22
 
 ### Added

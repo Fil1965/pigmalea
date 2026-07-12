@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
+import { getExifContext } from './imageProcessor.mjs';
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://localhost:11434';
 
@@ -244,8 +245,14 @@ export async function analyzeImage(filePath, selectedModel = null, keepAlive = n
     // 2. Auto-detect or use user selected model
     const activeModel = selectedModel || await getAvailableVisionModel();
 
+    // 2.1 Optional EXIF capture context for better adjustment recommendations
+    const exifContext = await getExifContext(filePath);
+    const exifBlock = exifContext
+      ? `\n\n=== Capture context (EXIF) ===\n${exifContext}\n\nUse this capture context to inform your recommendations.\n- If ISO is high, prefer denoise and avoid aggressive sharpen.\n- If shutter is slow, avoid boosting micro-contrast too aggressively.\n- If flash fired or white balance appears off, prioritize temperature/tint corrections.\n`
+      : '';
+
     // 3. Prepare prompt
-    const prompt = `Analyze this image (which might be low resolution, blurry, or poor quality) and suggest numerical adjustment values to enhance it.
+    const prompt = `Analyze this image (which might be low resolution, blurry, or poor quality) and suggest numerical adjustment values to enhance it.${exifBlock}
     
 You must return a JSON object. The response must follow this EXACT schema:
 {

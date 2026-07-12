@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import fs from 'fs/promises';
+import exifr from 'exifr';
 
 /**
  * Applies AI-suggested or manual enhancements to an image using Sharp.
@@ -136,13 +137,142 @@ export async function getImageMetadata(filePath) {
   try {
     const metadata = await sharp(filePath).metadata();
     const stats = await fs.stat(filePath);
+
+    let captured_at = null;
+    let gps_latitude = null;
+    let gps_longitude = null;
+
+    // Extended EXIF (Tier 1: camera + exposure, useful for the AI assistant & the user)
+    let camera_make = null;
+    let camera_model = null;
+    let lens_model = null;
+    let fnumber = null;
+    let exposure_time = null; // seconds
+    let iso = null;
+    let focal_length = null; // mm
+    let focal_length_35mm = null; // mm
+    let flash = null;
+    let white_balance = null;
+    let software = null;
+    let artist = null;
+
+    try {
+      const parsedExif = await exifr.parse(filePath, {
+        tiff: true,
+        ifd0: true,
+        exif: true,
+        gps: true
+      }).catch(() => null);
+      if (parsedExif) {
+        if (parsedExif.DateTimeOriginal) {
+          captured_at = parsedExif.DateTimeOriginal instanceof Date
+            ? parsedExif.DateTimeOriginal.toISOString()
+            : new Date(parsedExif.DateTimeOriginal).toISOString();
+        }
+        if (parsedExif.latitude !== undefined && parsedExif.longitude !== undefined) {
+          gps_latitude = parsedExif.latitude;
+          gps_longitude = parsedExif.longitude;
+        }
+
+        // Camera body
+        if (parsedExif.Make)   camera_make  = String(parsedExif.Make).trim()  || null;
+        if (parsedExif.Model)  camera_model = String(parsedExif.Model).trim() || null;
+        if (parsedExif.LensModel) lens_model = String(parsedExif.LensModel).trim() || null;
+
+        // Exposure
+        if (typeof parsedExif.FNumber === 'number')   fnumber = parsedExif.FNumber;
+        if (typeof parsedExif.ExposureTime === 'number') exposure_time = parsedExif.ExposureTime;
+        if (typeof parsedExif.ISO === 'number')       iso = parsedExif.ISO;
+        if (typeof parsedExif.FocalLength === 'number') focal_length = parsedExif.FocalLength;
+        if (typeof parsedExif.FocalLengthIn35mmFormat === 'number') focal_length_35mm = parsedExif.FocalLengthIn35mmFormat;
+
+        // Other useful context
+        if (parsedExif.Flash !== undefined && parsedExif.Flash !== null) flash = parsedExif.Flash;
+        if (parsedExif.WhiteBalance !== undefined && parsedExif.WhiteBalance !== null) white_balance = parsedExif.WhiteBalance;
+        if (parsedExif.Software) software = String(parsedExif.Software).trim() || null;
+        if (parsedExif.Artist)   artist   = String(parsedExif.Artist).trim()   || null;
+      }
+    } catch (exifErr) {
+      console.error('Error reading EXIF data:', exifErr);
+    }
+
     return {
       width: metadata.width,
       height: metadata.height,
-      size: stats.size
+      size: stats.size,
+      captured_at,
+      gps_latitude,
+      gps_longitude,
+      camera_make,
+      camera_model,
+      lens_model,
+      fnumber,
+      exposure_time,
+      iso,
+      focal_length,
+      focal_length_35mm,
+      flash,
+      white_balance,
+      software,
+      artist
     };
   } catch (err) {
     console.error('Error reading image metadata:', err);
     throw err;
+  }
+}
+
+/**
+ * Builds a compact EXIF capture context string for the AI prompt.
+ * @param {string} filePath - Absolute path to the image.
+ * @returns {Promise<string|null>} Formatted context lines or null if no useful EXIF exists.
+ */
+export async function getExifContext(filePath) {
+  try {
+    const parsedExif = await exifr.parse(filePath, {
+      tiff: true,
+      ifd0: true,
+      exif: true,
+      gps: true
+    }).catch(() => null);
+
+    if (!parsedExif) return null;
+
+    const lines = [];
+
+    const make = parsedExif.Make ? String(parsedExif.Make).trim() : null;
+    const model = parsedExif.Model ? String(parsedExif.Model).trim() : null;
+    const lens = parsedExif.LensModel ? String(parsedExif.LensModel).trim() : null;
+    const fnumber = (typeof parsedExif.FNumber === 'number') ? parsedExif.FNumber : null;
+    const exposure = (typeof parsedExif.ExposureTime === 'number') ? parsedExif.ExposureTime : null;
+    const iso = (typeof parsedExif.ISO === 'number') ? parsedExif.ISO : null;
+    const focal = (typeof parsedExif.FocalLength === 'number') ? parsedExif.FocalLength : null;
+    const focal35 = (typeof parsedExif.FocalLengthIn35mmFormat === 'number') ? parsedExif.FocalLengthIn35mmFormat : null;
+    const flash = (parsedExif.Flash !== undefined && parsedExif.Flash !== null) ? String(parsedExif.Flash) : null;
+
+    if (make || model) {
+      lines.push(`Camera: ${[make, model].filter(Boolean).join(' ')}`.trim());
+    }
+    if (lens) lines.push(`Lens: ${lens}`);
+    if (fnumber) lines.push(`Aperture: f/${fnumber.toFixed(fnumber < 10 ? 1 : 0)}`);
+    if (exposure) {
+      if (exposure >= 1) {
+        lines.push(`Shutter: ${exposure < 10 ? exposure.toFixed(1) : Math.round(exposure)}s`);
+      } else {
+        lines.push(`Shutter: 1/${Math.round(1 / exposure)}s`);
+      }
+    }
+    if (iso) lines.push(`ISO: ${iso}`);
+    if (focal) {
+      const focalText = focal35 ? `${focal.toFixed(focal < 10 ? 1 : 0)}mm (~${Math.round(focal35)}mm eq)` : `${focal.toFixed(focal < 10 ? 1 : 0)}mm`;
+      lines.push(`Focal length: ${focalText}`);
+    }
+    if (flash) lines.push(`Flash: ${flash}`);
+
+    if (lines.length === 0) return null;
+    return lines.join('\n');
+  } catch (err) {
+    console.error('Error building EXIF context:', err);
+    return null;
   }
 }

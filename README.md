@@ -101,7 +101,7 @@ Pigmalea/
 
 ### Gestión de Imágenes (Requieren autenticación)
 *   `GET /api/images` - Obtiene todas las imágenes subidas por el usuario logueado.
-*   `POST /api/upload` - Sube una o varias imágenes originales en un payload multipart form-data. Campo esperado: `image`.
+*   `POST /api/upload` - Sube una o varias imágenes originales en un payload multipart form-data. Campo esperado: `image`. Filtra y omite automáticamente imágenes idénticas (duplicados) del usuario basándose en su hash criptográfico SHA-256, devolviendo detalles de los archivos subidos y omitidos.
 *   `POST /api/images/:id/analyze` - Envía la imagen original a Ollama para que la analice y devuelva recomendaciones de mejora estructuradas. Body opcional: `{ "model": "nombre:tag" }`.
 *   `POST /api/images/:id/enhance` - Aplica mejoras de Sharp sobre la imagen original. Si se omite el cuerpo de la petición, se aplican los parámetros recomendados por la IA. Body opcional:
     ```json

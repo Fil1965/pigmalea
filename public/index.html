@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
   <!-- Custom Stylesheet -->
   <link rel="stylesheet" href="style.css">
   <!-- Favicon -->
@@ -272,6 +272,16 @@
                   <h3><i class="fa-solid fa-sliders"></i> Ajustes de Optimización</h3>
                 </div>
                 <div class="card-body">
+                  <!-- Copy/Paste Adjustments Toolbar -->
+                  <div class="adjustments-toolbar" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px;">
+                    <button class="btn btn-secondary btn-sm" onclick="copyCurrentAdjustments()" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;" title="Copiar estos ajustes de optimización">
+                      <i class="fa-solid fa-copy"></i> Copiar Ajustes
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="btn-paste-adjustments" onclick="pasteAdjustments()" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;" title="Pegar ajustes copiados" disabled>
+                      <i class="fa-solid fa-paste"></i> Pegar Ajustes
+                    </button>
+                  </div>
+
                   <!-- Brillo -->
                   <div class="control-group">
                     <div class="control-label">
@@ -426,6 +436,14 @@
                   <div class="meta-info">
                     <div class="meta-row"><span>Original:</span> <span id="meta-orig-res">0x0</span> (<span id="meta-orig-size">0 KB</span>)</div>
                     <div class="meta-row" id="meta-enh-row"><span>Optimizado:</span> <span id="meta-enh-res">0x0</span> (<span id="meta-enh-size">0 KB</span>)</div>
+                    <div class="meta-row" id="meta-capture-date-row"><span>Fecha Toma:</span> <span id="meta-capture-date">N/A</span></div>
+                    <div class="meta-row" id="meta-location-row"><span>Ubicación:</span> <span id="meta-location">N/A</span></div>
+                    <div class="meta-row meta-section" id="meta-camera-row"><span><i class="fa-solid fa-camera-retro"></i> Cámara:</span> <span id="meta-camera">N/A</span></div>
+                    <div class="meta-row" id="meta-lens-row"><span><i class="fa-solid fa-circle-dot"></i> Lente:</span> <span id="meta-lens">N/A</span></div>
+                    <div class="meta-row meta-section" id="meta-exposure-row"><span><i class="fa-solid fa-aperture"></i> Exposición:</span> <span id="meta-exposure">N/A</span></div>
+                    <div class="meta-row" id="meta-focal-row"><span><i class="fa-solid fa-ruler-combined"></i> Focal:</span> <span id="meta-focal">N/A</span></div>
+                    <div class="meta-row" id="meta-flash-row"><span><i class="fa-solid fa-bolt"></i> Flash:</span> <span id="meta-flash">N/A</span></div>
+                    <div class="meta-row" id="meta-software-row"><span><i class="fa-solid fa-microchip"></i> Software:</span> <span id="meta-software">N/A</span></div>
                   </div>
                   <div class="download-buttons">
                     <a id="btn-dl-original" href="#" download class="btn btn-secondary btn-sm" title="Descargar original"><i class="fa-solid fa-download"></i> Original</a>
@@ -450,6 +468,25 @@
     <div class="toast-content">
       <i class="fa-solid fa-circle-exclamation toast-icon"></i>
       <span id="toast-message">Mensaje de alerta</span>
+    </div>
+  </div>
+
+  <!-- Duplicate Files Modal -->
+  <div id="duplicate-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <i class="fa-solid fa-copy modal-header-icon"></i>
+        <h3>Imágenes Duplicadas Detectadas</h3>
+      </div>
+      <div class="modal-body">
+        <p>Las siguientes imágenes no se subieron porque ya existen en tu galería o en este lote:</p>
+        <ul id="duplicate-files-list" class="duplicate-list">
+          <!-- Populated dynamically -->
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="closeDuplicateModal()">Entendido</button>
+      </div>
     </div>
   </div>
 

@@ -6,12 +6,13 @@ import fastifySession from '@fastify/session';
 import path from 'path';
 import fs from 'fs';
 import { pipeline } from 'stream/promises';
+import { Writable } from 'stream';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 
 // Import local helper modules
-import { initDb, run, get, all } from './db.mjs';
+import { initDb, run, get, all, getFileHash } from './db.mjs';
 import { analyzeImage, getAvailableVisionModel, getInstalledVisionModels } from './ollama.mjs';
 import { enhanceImage, getImageMetadata } from './imageProcessor.mjs';
 
@@ -29,7 +30,53 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 if (!fs.existsSync(originalsDir)) fs.mkdirSync(originalsDir);
 if (!fs.existsSync(enhancedDir)) fs.mkdirSync(enhancedDir);
 
-const fastify = fastifyPkg({ logger: true });
+// Custom pretty log stream to format Fastify/Pino JSON logs to console
+// and write raw JSON logs to server.log
+const logFile = path.join(__dirname, 'server.log');
+const logFileStream = fs.createWriteStream(logFile, { flags: 'a' });
+
+const customLoggerStream = new Writable({
+  write(chunk, encoding, callback) {
+    const rawLine = chunk.toString();
+    logFileStream.write(rawLine);
+
+    try {
+      const log = JSON.parse(rawLine.trim());
+      const date = new Date(log.time || Date.now()).toLocaleTimeString();
+      
+      let levelName = 'INFO';
+      if (log.level === 60) levelName = 'FATAL';
+      else if (log.level === 50) levelName = 'ERROR';
+      else if (log.level === 40) levelName = 'WARN';
+      else if (log.level === 30) levelName = 'INFO';
+      else if (log.level === 20) levelName = 'DEBUG';
+      else if (log.level === 10) levelName = 'TRACE';
+      
+      let msg = log.msg || '';
+      
+      if (log.req) {
+        msg = `--> ${log.req.method} ${log.req.url}`;
+      } else if (log.res) {
+        const timeTaken = log.responseTime ? ` in ${log.responseTime.toFixed(1)}ms` : '';
+        msg = `<-- ${log.res.statusCode}${timeTaken}`;
+      } else if (log.err) {
+        msg = `${msg} - Error: ${log.err.message}\n${log.err.stack || ''}`;
+      }
+      
+      console.log(`[${date}] [${levelName}] ${msg}`);
+    } catch (e) {
+      console.log(rawLine.trim());
+    }
+    callback();
+  }
+});
+
+const fastify = fastifyPkg({
+  logger: {
+    level: 'info',
+    stream: customLoggerStream
+  }
+});
 
 // Register cookies and session
 fastify.register(fastifyCookie);
@@ -194,11 +241,11 @@ fastify.get('/api/info/version', async (request, reply) => {
 fastify.get('/api/images', { preHandler: requireAuth }, async (request, reply) => {
   try {
     const images = await all(
-      'SELECT id, filename, filepath, original_name, size, width, height, status, ai_analysis, enhanced_filename, created_at FROM images WHERE user_id = ? ORDER BY created_at DESC',
+      'SELECT id, filename, filepath, original_name, size, width, height, status, ai_analysis, applied_adjustments, enhanced_filename, created_at, captured_at, gps_latitude, gps_longitude, camera_make, camera_model, lens_model, fnumber, exposure_time, iso, focal_length, focal_length_35mm, flash, white_balance, software, artist FROM images WHERE user_id = ? ORDER BY created_at DESC',
       [request.session.userId]
     );
     
-    // Parse ai_analysis string to object for frontend convenience
+    // Parse JSON strings to objects for frontend convenience
     const parsedImages = images.map(img => {
       let analysis = null;
       if (img.ai_analysis) {
@@ -208,9 +255,18 @@ fastify.get('/api/images', { preHandler: requireAuth }, async (request, reply) =
           fastify.log.error('Error parsing stored AI analysis JSON:', e);
         }
       }
+      let applied = null;
+      if (img.applied_adjustments) {
+        try {
+          applied = JSON.parse(img.applied_adjustments);
+        } catch (e) {
+          fastify.log.error('Error parsing stored applied adjustments JSON:', e);
+        }
+      }
       return {
         ...img,
         ai_analysis: analysis,
+        applied_adjustments: applied,
         original_url: `/uploads/originals/${img.filename}`,
         enhanced_url: img.enhanced_filename ? `/uploads/enhanced/${img.enhanced_filename}` : null
       };
@@ -227,6 +283,7 @@ fastify.get('/api/images', { preHandler: requireAuth }, async (request, reply) =
 fastify.post('/api/upload', { preHandler: requireAuth }, async (request, reply) => {
   const parts = request.files();
   const uploadedImages = [];
+  const duplicateImages = [];
   
   try {
     for await (const part of parts) {
@@ -249,13 +306,35 @@ fastify.post('/api/upload', { preHandler: requireAuth }, async (request, reply) 
 
         await pipeline(part.file, fs.createWriteStream(savedFilepath));
 
+        // Compute hash of the saved file
+        const hash = await getFileHash(savedFilepath);
+
+        // Check if this hash is already uploaded by the current user or in this batch
+        const existing = await get(
+          'SELECT id, original_name FROM images WHERE user_id = ? AND hash = ?',
+          [request.session.userId, hash]
+        );
+        const isDuplicateInBatch = uploadedImages.some(img => img.hash === hash);
+
+        if (existing || isDuplicateInBatch) {
+          // It's a duplicate, delete from disk
+          if (fs.existsSync(savedFilepath)) {
+            try { fs.unlinkSync(savedFilepath); } catch (e) {}
+          }
+          duplicateImages.push({
+            original_name: originalName,
+            hash: hash
+          });
+          continue; // skip DB save
+        }
+
         // Get metadata (width, height, size)
         const meta = await getImageMetadata(savedFilepath);
 
-        // Save into database
+        // Save into database including hash and EXIF metadata
         const dbResult = await run(
-          `INSERT INTO images (user_id, filename, filepath, original_name, size, width, height, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO images (user_id, filename, filepath, original_name, size, width, height, status, hash, captured_at, gps_latitude, gps_longitude, exif_processed, camera_make, camera_model, lens_model, fnumber, exposure_time, iso, focal_length, focal_length_35mm, flash, white_balance, software, artist)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             request.session.userId,
             uniqueFilename,
@@ -264,7 +343,24 @@ fastify.post('/api/upload', { preHandler: requireAuth }, async (request, reply) 
             meta.size,
             meta.width,
             meta.height,
-            'uploaded'
+            'uploaded',
+            hash,
+            meta.captured_at,
+            meta.gps_latitude,
+            meta.gps_longitude,
+            1, // Mark EXIF as processed on upload
+            meta.camera_make,
+            meta.camera_model,
+            meta.lens_model,
+            meta.fnumber,
+            meta.exposure_time,
+            meta.iso,
+            meta.focal_length,
+            meta.focal_length_35mm,
+            meta.flash !== null && meta.flash !== undefined ? String(meta.flash) : null,
+            meta.white_balance !== null && meta.white_balance !== undefined ? String(meta.white_balance) : null,
+            meta.software,
+            meta.artist
           ]
         );
 
@@ -272,10 +368,26 @@ fastify.post('/api/upload', { preHandler: requireAuth }, async (request, reply) 
           id: dbResult.id,
           filename: uniqueFilename,
           filepath: savedFilepath, // Stored temporarily for cleanup on failure
+          hash: hash, // Stored temporarily for batch duplicate check
           original_name: originalName,
           size: meta.size,
           width: meta.width,
           height: meta.height,
+          captured_at: meta.captured_at,
+          gps_latitude: meta.gps_latitude,
+          gps_longitude: meta.gps_longitude,
+          camera_make: meta.camera_make,
+          camera_model: meta.camera_model,
+          lens_model: meta.lens_model,
+          fnumber: meta.fnumber,
+          exposure_time: meta.exposure_time,
+          iso: meta.iso,
+          focal_length: meta.focal_length,
+          focal_length_35mm: meta.focal_length_35mm,
+          flash: meta.flash,
+          white_balance: meta.white_balance,
+          software: meta.software,
+          artist: meta.artist,
           status: 'uploaded',
           original_url: `/uploads/originals/${uniqueFilename}`,
           enhanced_url: null,
@@ -284,19 +396,20 @@ fastify.post('/api/upload', { preHandler: requireAuth }, async (request, reply) 
       }
     }
 
-    if (uploadedImages.length === 0) {
+    if (uploadedImages.length === 0 && duplicateImages.length === 0) {
       return reply.status(400).send({ error: 'No se ha proporcionado ninguna imagen.' });
     }
 
-    // Remove the temporary filepath field before returning
+    // Remove the temporary filepath and hash fields before returning
     const responseImages = uploadedImages.map(img => {
-      const { filepath, ...rest } = img;
+      const { filepath, hash, ...rest } = img;
       return rest;
     });
 
     return {
       success: true,
-      images: responseImages
+      images: responseImages,
+      duplicates: duplicateImages
     };
 
   } catch (err) {
@@ -387,8 +500,8 @@ fastify.post('/api/images/:id/enhance', { preHandler: requireAuth }, async (requ
 
     // Save details in DB
     await run(
-      'UPDATE images SET status = ?, enhanced_filepath = ?, enhanced_filename = ? WHERE id = ?',
-      ['enhanced', enhancedFilepath, enhancedFilename, imageId]
+      'UPDATE images SET status = ?, enhanced_filepath = ?, enhanced_filename = ?, applied_adjustments = ? WHERE id = ?',
+      ['enhanced', enhancedFilepath, enhancedFilename, JSON.stringify(options), imageId]
     );
 
     return {
@@ -399,6 +512,22 @@ fastify.post('/api/images/:id/enhance', { preHandler: requireAuth }, async (requ
         original_name: image.original_name,
         size: image.size,
         status: 'enhanced',
+        applied_adjustments: options,
+        captured_at: image.captured_at,
+        gps_latitude: image.gps_latitude,
+        gps_longitude: image.gps_longitude,
+        camera_make: image.camera_make,
+        camera_model: image.camera_model,
+        lens_model: image.lens_model,
+        fnumber: image.fnumber,
+        exposure_time: image.exposure_time,
+        iso: image.iso,
+        focal_length: image.focal_length,
+        focal_length_35mm: image.focal_length_35mm,
+        flash: image.flash,
+        white_balance: image.white_balance,
+        software: image.software,
+        artist: image.artist,
         original_url: `/uploads/originals/${image.filename}`,
         enhanced_url: `/uploads/enhanced/${enhancedFilename}`,
         enhanced_width: outputMeta.width,

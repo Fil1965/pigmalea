@@ -1295,9 +1295,33 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .meta-row {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.85rem;
+  gap: 12px;
 }
 .meta-row span:first-child {
   color: var(--text-muted);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.meta-row span:last-child {
+  text-align: right;
+  color: var(--text-main);
+  word-break: break-word;
+}
+.meta-row.meta-section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+  font-weight: 600;
+}
+.meta-row.meta-section span:first-child {
+  color: var(--primary-color);
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
 }
 
 .download-buttons {
@@ -1686,5 +1710,153 @@ input[type="range"]::-webkit-slider-thumb:hover {
   flex: 1;
   text-align: center;
   justify-content: center;
+}
+
+/* ==========================================================================
+   Duplicate Modal CSS
+   ========================================================================== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(6, 9, 17, 0.85);
+  backdrop-filter: blur(10px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-card {
+  width: 90%;
+  max-width: 480px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 30px;
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-glow);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  transform: translateY(20px);
+  transition: transform 0.3s ease;
+}
+
+.modal-overlay.active .modal-card {
+  transform: translateY(0);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 15px;
+}
+
+.modal-header-icon {
+  font-size: 1.6rem;
+  color: hsl(35, 100%, 60%); /* Warning orange tint */
+}
+
+.modal-header h3 {
+  font-size: 1.3rem;
+  margin: 0;
+  background: linear-gradient(135deg, #ffffff 0%, hsl(35, 100%, 75%) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-family: var(--font-header);
+}
+
+.modal-body {
+  color: var(--text-color);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.modal-body p {
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.duplicate-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.duplicate-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.9rem;
+}
+
+.duplicate-list li:last-child {
+  border-bottom: none;
+}
+
+.duplicate-list li i {
+  color: hsl(35, 100%, 60%); /* Alert orange icon */
+}
+
+.duplicate-list li span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 380px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-color);
+  padding-top: 15px;
+}
+
+.modal-footer .btn {
+  min-width: 100px;
+}
+
+.map-link {
+  color: hsl(260, 100%, 75%);
+  text-decoration: none;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: color 0.2s ease;
+}
+
+.map-link:hover {
+  color: hsl(260, 100%, 85%);
+  text-decoration: underline;
+}
+
+.exif-badge {
+  color: hsl(260, 100%, 75%);
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 

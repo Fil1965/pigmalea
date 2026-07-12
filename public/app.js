@@ -26,6 +26,73 @@ const DEFAULT_ADJUSTMENTS = {
 };
 
 // ==========================================================================
+// EXIF Formatters (camera + exposure)
+// ==========================================================================
+function formatExposureTime(t) {
+  if (typeof t !== 'number' || !isFinite(t) || t <= 0) return null;
+  if (t >= 1) {
+    // Long exposures: render as decimal seconds with up to 1 decimal (e.g. 2.5")
+    return t < 10 ? `${t.toFixed(1)}s` : `${Math.round(t)}s`;
+  }
+  // Sub-second: render as 1/n fraction
+  const denom = Math.round(1 / t);
+  return `1/${denom}s`;
+}
+
+function formatFNumber(fn) {
+  if (typeof fn !== 'number' || !isFinite(fn) || fn <= 0) return null;
+  // f/1.4, f/2.8, f/5.6 (rounded to 1 decimal)
+  return `f/${fn.toFixed(fn < 10 ? 1 : 0)}`;
+}
+
+function formatFocalLength(mm, mm35) {
+  if (typeof mm !== 'number' || !isFinite(mm) || mm <= 0) return null;
+  const real = `${mm.toFixed(mm < 10 ? 1 : 0)}mm`;
+  if (typeof mm35 === 'number' && isFinite(mm35) && mm35 > 0 && Math.abs(mm35 - mm) > 0.5) {
+    return `${real} (≈ ${Math.round(mm35)}mm)`;
+  }
+  return real;
+}
+
+function formatFlash(flash) {
+  if (flash === null || flash === undefined) return null;
+  // exifr returns Flash as a numeric bitmask. Bit 0 = fired, bit 1/2 = mode, etc.
+  if (typeof flash === 'object' && flash !== null) {
+    // Some versions return a Flash object; bail out to raw if unknown.
+    return null;
+  }
+  const fired = Number(flash) & 0x01;
+  if (fired) return 'Disparado';
+  return 'No disparado';
+}
+
+function formatCamera(make, model) {
+  const m = (make || '').trim();
+  const M = (model || '').trim();
+  if (M) {
+    // Strip duplicated manufacturer prefix (e.g. "Apple iPhone 15" -> keep "iPhone 15")
+    if (m && M.toLowerCase().startsWith(m.toLowerCase())) return M;
+    if (m) return `${m} ${M}`;
+    return M;
+  }
+  if (m) return m;
+  return null;
+}
+
+function setRow(id, value) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  if (value === null || value === undefined || value === '') {
+    row.classList.add('hidden');
+  } else {
+    row.classList.remove('hidden');
+    // We expect the value node to be the last <span> in the row
+    const target = row.querySelector('span:last-child');
+    if (target) target.textContent = value;
+  }
+}
+
+// ==========================================================================
 // Initialization & Session Check
 // ==========================================================================
 document.addEventListener('DOMContentLoaded', () => {
@@ -253,6 +320,12 @@ function renderGallery() {
     const displaySize = formatBytes(img.status === 'enhanced' && img.enhanced_size ? img.enhanced_size : img.size);
     const displayRes = img.status === 'enhanced' && img.enhanced_width ? `${img.enhanced_width}x${img.enhanced_height}` : `${img.width}x${img.height}`;
 
+    // EXIF indicators
+    let exifBadge = '';
+    if (img.captured_at || (img.gps_latitude !== null && img.gps_longitude !== null)) {
+      exifBadge = `<span class="exif-badge" title="Contiene datos EXIF (Fecha/GPS)"><i class="fa-solid fa-camera"></i></span>`;
+    }
+
     card.innerHTML = `
       <!-- Card Selection Checkbox -->
       <div class="card-select-container" onclick="event.stopPropagation();">
@@ -260,16 +333,19 @@ function renderGallery() {
         <label for="chk-img-${img.id}" class="card-checkbox-label"></label>
       </div>
 
-      <div class="card-preview">
+      <div class="card-preview" onclick="openWorkspace(${img.id})">
         <img src="${previewUrl}" alt="${img.original_name}" loading="lazy">
         <span class="badge ${badgeClass} card-badge">${statusLabel}</span>
         <div class="card-overlay">
-          <button class="card-btn card-btn-view" onclick="openWorkspace(${img.id})" title="Abrir mesa de trabajo"><i class="fa-solid fa-laptop-code"></i></button>
-          <button class="card-btn card-btn-delete" onclick="deleteImage(${img.id}, event)" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
+          <button class="card-btn card-btn-view" onclick="event.stopPropagation(); openWorkspace(${img.id})" title="Abrir mesa de trabajo"><i class="fa-solid fa-laptop-code"></i></button>
+          <button class="card-btn card-btn-delete" onclick="event.stopPropagation(); deleteImage(${img.id}, event)" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
         </div>
       </div>
       <div class="card-info">
-        <h4>${img.original_name}</h4>
+        <h4 style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${img.original_name}</span>
+          ${exifBadge}
+        </h4>
         <div class="card-meta">
           <span>${displayRes}</span>
           <span>${displaySize}</span>
@@ -688,14 +764,52 @@ async function performUpload() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
-    const count = state.selectedFiles.length;
-    showToast(count === 1 ? 'Imagen subida correctamente.' : `${count} imágenes subidas correctamente.`, 'success');
-    navigateTo('gallery');
+    const uploadedCount = data.images ? data.images.length : 0;
+    const duplicates = data.duplicates || [];
+
+    if (uploadedCount > 0) {
+      showToast(uploadedCount === 1 ? 'Imagen subida correctamente.' : `${uploadedCount} imágenes subidas correctamente.`, 'success');
+    }
+
+    if (duplicates.length > 0) {
+      showDuplicateModal(duplicates);
+    } else {
+      navigateTo('gallery');
+    }
   } catch (err) {
     showToast(err.message, 'error');
     btn.disabled = false;
     txt.textContent = state.selectedFiles.length === 1 ? 'Subir Imagen' : `Subir ${state.selectedFiles.length} Imágenes`;
   }
+}
+
+function showDuplicateModal(duplicates) {
+  const modal = document.getElementById('duplicate-modal');
+  const list = document.getElementById('duplicate-files-list');
+  list.innerHTML = '';
+  
+  duplicates.forEach(file => {
+    const li = document.createElement('li');
+    li.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <span>${escapeHtml(file.original_name)}</span>`;
+    list.appendChild(li);
+  });
+  
+  modal.classList.add('active');
+}
+
+function closeDuplicateModal() {
+  const modal = document.getElementById('duplicate-modal');
+  modal.classList.remove('active');
+  navigateTo('gallery');
+}
+
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 // ==========================================================================
@@ -749,17 +863,60 @@ function openWorkspace(imageId) {
   } else {
     document.getElementById('meta-enh-row').classList.add('hidden');
   }
+
+  // Setup EXIF metadata display
+  if (image.captured_at) {
+    document.getElementById('meta-capture-date-row').classList.remove('hidden');
+    document.getElementById('meta-capture-date').textContent = new Date(image.captured_at).toLocaleString();
+  } else {
+    document.getElementById('meta-capture-date-row').classList.add('hidden');
+  }
+
+  if (image.gps_latitude !== null && image.gps_longitude !== null && image.gps_latitude !== undefined && image.gps_longitude !== undefined) {
+    document.getElementById('meta-location-row').classList.remove('hidden');
+    const lat = parseFloat(image.gps_latitude).toFixed(6);
+    const lng = parseFloat(image.gps_longitude).toFixed(6);
+    document.getElementById('meta-location').innerHTML = `
+      <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" class="map-link">
+        <i class="fa-solid fa-map-location-dot"></i> ${lat}, ${lng}
+      </a>`;
+  } else {
+    document.getElementById('meta-location-row').classList.add('hidden');
+  }
+
+  // Extended EXIF: camera + exposure (Tier 1)
+  const cameraText = formatCamera(image.camera_make, image.camera_model);
+  setRow('meta-camera-row', cameraText);
+  setRow('meta-lens-row',   image.lens_model || null);
+
+  // Compose the exposure line: f/N · 1/Xs · ISO Y
+  const parts = [];
+  const fn = formatFNumber(image.fnumber);
+  const et = formatExposureTime(image.exposure_time);
+  const iso = (typeof image.iso === 'number' && image.iso > 0) ? `ISO ${image.iso}` : null;
+  if (fn)  parts.push(fn);
+  if (et)  parts.push(et);
+  if (iso) parts.push(iso);
+  setRow('meta-exposure-row', parts.length ? parts.join(' · ') : null);
+
+  setRow('meta-focal-row',  formatFocalLength(image.focal_length, image.focal_length_35mm));
+  setRow('meta-flash-row',  formatFlash(image.flash));
+  setRow('meta-software-row', image.software || null);
+
   document.getElementById('meta-card').classList.remove('hidden');
 
   // Load AI details
   renderAIAnalysis(image.ai_analysis);
 
-  // Setup parameter sliders to either stored AI recommendations or neutral defaults
+  // Setup parameter sliders: prioritize applied manual adjustments, then AI recommendations, then neutral defaults
   let params = { ...DEFAULT_ADJUSTMENTS };
-  if (image.ai_analysis && image.ai_analysis.adjustments) {
+  if (image.applied_adjustments) {
+    params = { ...params, ...image.applied_adjustments };
+  } else if (image.ai_analysis && image.ai_analysis.adjustments) {
     params = { ...params, ...image.ai_analysis.adjustments };
   }
   setSlidersValues(params);
+  updatePasteButtonState();
 
   navigateTo('workspace');
 }
@@ -873,11 +1030,7 @@ async function enhanceImage() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
-    state.currentImage.status = data.image.status;
-    state.currentImage.enhanced_url = data.image.enhanced_url;
-    state.currentImage.enhanced_width = data.image.enhanced_width;
-    state.currentImage.enhanced_height = data.image.enhanced_height;
-    state.currentImage.enhanced_size = data.image.enhanced_size;
+    state.currentImage = { ...state.currentImage, ...data.image };
 
     // Update global list cache
     const cachedIdx = state.images.findIndex(img => img.id === state.currentImage.id);
@@ -941,6 +1094,48 @@ function setSlidersValues(adjustments) {
 function updateSliderVal(param, val) {
   const formattedVal = parseFloat(val).toFixed(2);
   document.getElementById(`val-${param}`).textContent = formattedVal;
+}
+
+function copyCurrentAdjustments() {
+  const adjustments = {
+    brightness: parseFloat(document.getElementById('slider-brightness').value),
+    contrast: parseFloat(document.getElementById('slider-contrast').value),
+    saturation: parseFloat(document.getElementById('slider-saturation').value),
+    sharpness: parseFloat(document.getElementById('slider-sharpness').value),
+    temperature: parseFloat(document.getElementById('slider-temperature').value),
+    tint: parseFloat(document.getElementById('slider-tint').value),
+    rotate: parseInt(document.getElementById('select-rotate').value, 10),
+    denoise: document.getElementById('check-denoise').checked,
+    upscale: document.getElementById('check-upscale').checked
+  };
+
+  localStorage.setItem('pigmalea_copied_adjustments', JSON.stringify(adjustments));
+  showToast('Ajustes de optimización copiados.', 'success');
+  updatePasteButtonState();
+}
+
+function pasteAdjustments() {
+  const stored = localStorage.getItem('pigmalea_copied_adjustments');
+  if (!stored) {
+    showToast('No hay ajustes copiados para pegar.', 'error');
+    return;
+  }
+
+  try {
+    const adj = JSON.parse(stored);
+    setSlidersValues(adj);
+    showToast('Ajustes aplicados correctamente.', 'success');
+  } catch (e) {
+    console.error('Error pasting adjustments:', e);
+    showToast('Error al aplicar los ajustes.', 'error');
+  }
+}
+
+function updatePasteButtonState() {
+  const btn = document.getElementById('btn-paste-adjustments');
+  if (!btn) return;
+  const stored = localStorage.getItem('pigmalea_copied_adjustments');
+  btn.disabled = !stored;
 }
 
 // Before/After comparison slider handle dragging mechanics
