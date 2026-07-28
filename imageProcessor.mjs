@@ -12,7 +12,9 @@ import exifr from 'exifr';
  * @param {number} [options.saturation=1.0] - Saturation multiplier (0.0 to 2.0)
  * @param {number} [options.sharpness=0] - Sharpness level (0.0 to 5.0)
  * @param {boolean} [options.denoise=false] - Whether to apply noise reduction
- * @param {boolean} [options.upscale=false] - Whether to upscale the image by 2x
+ * @param {boolean} [options.upscale=false] - Reserved for compatibility. When true, the
+ *   server-side pipeline skips upscaling (the client is expected to do it via UpscalerJS).
+ *   To force a server-side Lanczos 2x upscale, call `upscaleLanczos()` instead.
  * @param {number} [options.temperature=1.0] - Color temperature multiplier (0.5 to 1.5)
  * @param {number} [options.tint=1.0] - Color tint multiplier (0.5 to 1.5)
  * @returns {Promise<Object>} Metadata of the enhanced image (width, height, size).
@@ -24,14 +26,16 @@ export async function enhanceImage(inputPath, outputPath, options = {}) {
     saturation = 1.0,
     sharpness = 0,
     denoise = false,
-    upscale = false,
     rotate = 0,
     temperature = 1.0,
     tint = 1.0
   } = options;
 
+  // NOTE: `upscale` is intentionally NOT consumed here. Super-resolution upscaling is
+  // delegated to the client (UpscalerJS / ESRGAN). Server-side Lanczos fallback is
+  // available via the dedicated `upscaleLanczos()` export.
   console.log(`Processing image: ${inputPath} -> ${outputPath}`);
-  console.log('Options applied:', { brightness, contrast, saturation, sharpness, denoise, upscale, rotate, temperature, tint });
+  console.log('Options applied:', { brightness, contrast, saturation, sharpness, denoise, rotate, temperature, tint });
 
   try {
     let pipeline = sharp(inputPath);
@@ -91,21 +95,8 @@ export async function enhanceImage(inputPath, outputPath, options = {}) {
       pipeline = pipeline.linear(a, b);
     }
 
-    // 7. Upscaling (2x resizing with Lanczos interpolation if width < 1600px)
-    let currentWidth = metadata.width || 0;
-    const isRotated = metadata.orientation && metadata.orientation >= 5 && metadata.orientation <= 8;
-    if (isRotated && metadata.height) {
-      currentWidth = metadata.height;
-    }
-
-    if (upscale && currentWidth && currentWidth < 1600) {
-      const targetWidth = Math.round(currentWidth * 2);
-      console.log(`Upscaling image width from ${currentWidth}px to ${targetWidth}px (EXIF orientation corrected)`);
-      pipeline = pipeline.resize({
-        width: targetWidth,
-        kernel: sharp.kernel.lanczos
-      });
-    }
+    // 7. (Super-resolution upscaling is delegated to the client via UpscalerJS/ESRGAN.)
+    //    A server-side Lanczos fallback is available through `upscaleLanczos()`.
 
     // 8. Sharpening filter (always last to avoid amplifying noise)
     if (sharpness > 0.05) {
@@ -124,6 +115,53 @@ export async function enhanceImage(inputPath, outputPath, options = {}) {
     };
   } catch (err) {
     console.error('Error during image enhancement:', err);
+    throw err;
+  }
+}
+
+/**
+ * Applies a classic server-side 2x Lanczos upscale. Used as a fallback when the
+ * client cannot run UpscalerJS (no WebGL / failed model load). The upscale is
+ * conditional on the source width being below `maxWidth` (default 1600px), matching
+ * the previous in-pipeline behaviour.
+ *
+ * @param {string} inputPath  - Absolute path to the source image.
+ * @param {string} outputPath - Absolute path to the output image.
+ * @param {Object} [opts]
+ * @param {number} [opts.scale=2]        - Upscale factor.
+ * @param {number} [opts.maxWidth=Infinity] - Only upscale if source width < maxWidth.
+ *   Defaults to Infinity (always upscale) since this is now a dedicated fallback.
+ * @returns {Promise<Object>} Metadata of the upscaled image (width, height, size).
+ */
+export async function upscaleLanczos(inputPath, outputPath, opts = {}) {
+  const { scale = 2, maxWidth = Infinity } = opts;
+  try {
+    let pipeline = sharp(inputPath);
+    const metadata = await pipeline.metadata();
+
+    // Respect EXIF orientation when determining the operative width
+    let currentWidth = metadata.width || 0;
+    const isRotated = metadata.orientation && metadata.orientation >= 5 && metadata.orientation <= 8;
+    if (isRotated && metadata.height) {
+      currentWidth = metadata.height;
+    }
+
+    if (!currentWidth || currentWidth >= maxWidth) {
+      // Nothing to do — just copy the file through Sharp to guarantee a valid output
+      const info = await pipeline.toFile(outputPath);
+      console.log(`upscaleLanczos: source width ${currentWidth}px >= ${maxWidth}px, no upscale applied.`);
+      return { width: info.width, height: info.height, size: info.size };
+    }
+
+    const targetWidth = Math.round(currentWidth * scale);
+    console.log(`upscaleLanczos: ${currentWidth}px -> ${targetWidth}px (Lanczos, EXIF corrected)`);
+    const info = await pipeline
+      .resize({ width: targetWidth, kernel: sharp.kernel.lanczos })
+      .toFile(outputPath);
+
+    return { width: info.width, height: info.height, size: info.size };
+  } catch (err) {
+    console.error('Error during Lanczos upscale:', err);
     throw err;
   }
 }

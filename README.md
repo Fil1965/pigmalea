@@ -2,7 +2,7 @@
 
 Pigmalea es una aplicación web moderna diseñada para la carga, visualización y optimización de imágenes de baja calidad o resolución mediante técnicas asistidas por Inteligencia Artificial.
 
-La aplicación utiliza un backend potente construido sobre **Fastify** que coordina la persistencia en **SQLite**, el procesamiento rápido de imágenes a través de **Sharp** y el análisis inteligente de imágenes consultando de forma local a modelos de visión gestionados por **Ollama**.
+La aplicación utiliza un backend potente construido sobre **Fastify** que coordina la persistencia en **SQLite**, el procesamiento rápido de imágenes a través de **Sharp**, el análisis inteligente de imágenes consultando de forma local a modelos de visión gestionados por **Ollama**, y la **súper-resolución por GAN** (ESRGAN Slim 2x) ejecutada en el navegador mediante **UpscalerJS** sobre TensorFlow.js + WebGL.
 
 ---
 
@@ -13,6 +13,7 @@ La aplicación utiliza un backend potente construido sobre **Fastify** que coord
 *   **Análisis Multimodal con IA:** Detección de fallos visuales (desenfoque, ruido, bajo contraste, balance de blancos incorrecto) y recomendación de parámetros de mejora mediante Ollama.
 *   **Selección de Modelo de Visión:** El backend auto-detecta los modelos de visión instalados y permite elegir manualmente entre ellos.
 *   **Ajustes Asistidos y Manuales:** Posibilidad de aplicar las recomendaciones de la IA o realizar ajustes manuales personalizados en tiempo real.
+*   **Súper-Resolución por IA (ESRGAN 2x):** Aumento de resolución por red generativa adversaria (GAN) ejecutado 100% en el navegador vía UpscalerJS/ESRGAN Slim, con *fallback* automático a Lanczos en el servidor si no hay WebGL. El resultado se persiste en el servidor.
 *   **Comparación de Imagenes Split-Screen:** Deslizador (slider) interactivo antes/después para evaluar los resultados visuales de la optimización en paralelo.
 *   **Persistencia Robusta:** Historial de cargas e imágenes mejoradas almacenado en SQLite.
 

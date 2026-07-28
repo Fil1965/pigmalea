@@ -88,14 +88,14 @@ Do not include any text outside the JSON object. Do not include markdown code bl
 
 ## Orden del Pipeline de Mejora
 
-`imageProcessor.mjs` aplica las operaciones en un orden deliberado para evitar artefactos y degradaciones. El orden actual es:
+`imageProcessor.mjs` aplica las operaciones en un orden deliberado para evitar artefactos y degradaciones. El orden actual (v1.5.0+) es:
 
 1. **Auto-rotación EXIF** y **rotación manual**.
 2. **Reducción de ruido** (`median`).
 3. **Balance de blancos** (`temperature`/`tint` vía `recomb`).
 4. **Brillo y saturación** (`modulate`).
 5. **Contraste** (`linear`).
-6. **Upscaling** (`resize` con Lanczos).
+6. **(Delegado al cliente)** Súper-resolución por **UpscalerJS** (ESRGAN Slim 2x, TensorFlow.js + WebGL). El servidor ya no escala dentro de `enhanceImage`; el frontend decide si aplica ESRGAN 2x y, si no es posible, llama al endpoint `POST /api/images/:id/upscale` que ejecuta la función `upscaleLanczos()` como *fallback* clásico.
 7. **Nitidez** (`sharpen`).
 
 > **Nota sobre el espacio de color:** El balance de blancos se aplica directamente sobre la imagen en su espacio de trabajo sRGB mediante `.recomb()`. Se evita el cambio explícito a `scrgb` para prevenir salidas negras o inválidas que pueden producirse al combinar conversiones de espacio de color con operaciones de contraste/brightness en ciertos perfiles de imagen.
@@ -176,12 +176,21 @@ Una vez obtenidas las directrices de la IA (o personalizadas por el usuario), el
 
 ### 8. Superresolución / Redimensionamiento (Upscale)
 *   **Parámetro IA:** `adjustments.upscale` (booleano)
-*   **Mapeo Sharp:** Si está activo y el ancho de la imagen original es inferior a `1600px`, se duplica el ancho de la imagen manteniendo su proporción nativa y aplicando el algoritmo de interpolación **Lanczos** (ideal para conservar el detalle sin emborronar). El ancho se corrige según la orientación EXIF.
-*   **Código:**
+*   **Flujo principal (v1.5.0+):** El upscaling se delega al cliente. Tras la mejora, el frontend carga **UpscalerJS** con el modelo **ESRGAN Slim 2x** (vía CDN: `@tensorflow/tfjs` + `@upscalerjs/esrgan-slim` + `upscaler` UMD) y ejecuta `upscaler.execute(img, { output: 'base64', patchSize: 64, padding: 2, progress })`. Esto produce una súper-resolución por GAN que añade detalle real, manteniendo los píxeles en el dispositivo (*local-first*).
+*   **Fallback (servidor):** Si TensorFlow.js no está disponible, el backend no soporta WebGL, o la inferencia falla, el frontend llama a `POST /api/images/:id/upscale`, que ejecuta `upscaleLanczos()` en `imageProcessor.mjs`: un 2x clásico con interpolación **Lanczos** condicionado a que el ancho de la fuente sea inferior a `1600px` (corrigiendo la orientación EXIF).
+*   **Código (fallback Lanczos, `imageProcessor.mjs`):**
     ```javascript
     pipeline = pipeline.resize({
       width: currentWidth * 2,
       kernel: sharp.kernel.lanczos
+    });
+    ```
+*   **Código (cliente, `public/app.js`):**
+    ```javascript
+    const upscaler = new Upscaler({ model: ESRGANSlim2x });
+    const dataUrl = await upscaler.execute(imgEl, {
+      output: 'base64', patchSize: 64, padding: 2,
+      progress: (p) => updateProgress('Mejorando resolución…', p * 100)
     });
     ```
 

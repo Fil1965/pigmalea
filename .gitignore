@@ -22,4 +22,5 @@ tests/results/*.json
 
 # Obsidian
 .obsidian/
+
 server.log

@@ -6,6 +6,24 @@ All notable changes to the Pigmalea project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-28
+
+### Changed
+- **Súper-Resolución Delegada al Cliente (`imageProcessor.mjs`, `server.mjs`, `public/`):** El paso de upscaling del pipeline de mejora se ha extraído de `enhanceImage` y se ha delegado al frontend mediante **UpscalerJS** (ESRGAN Slim 2x corriendo sobre TensorFlow.js + WebGL en el navegador). Esto añade detalle real (super-resolution por GAN) en lugar de limitarse a una interpolación Lanczos, manteniendo la filosofía *local-first* (los píxeles nunca salen del dispositivo). El endpoint `POST /api/images/:id/enhance` ya no escala; en su lugar devuelve `ai_upscale_recommendation` y `upscaled_by` para que el frontend decida.
+
+### Added
+- **Orquestador de Súper-Resolución en el Frontend (`public/app.js`):** Nueva función `applySuperResolution()` que, tras cada mejora, si el checkbox "Súper-Resolución" está activo, ejecuta ESRGAN 2x en el cliente con `patchSize: 64` y barra de progreso en tiempo real. Si TensorFlow.js no está disponible, el backend no soporta WebGL, o la inferencia falla, se invoca automáticamente el nuevo endpoint `POST /api/images/:id/upscale` como *fallback* clásico Lanczos 2x en el servidor.
+- **Endpoint de Fallback de Upscale (`server.mjs`, `imageProcessor.mjs`):** Nuevo `POST /api/images/:id/upscale` que aplica un 2x Lanczos sobre la imagen mejorada (u original si no existe versión mejorada) y persiste el resultado. Utiliza la nueva función exportada `upscaleLanczos()`.
+- **Endpoint de Persistencia ESRGAN (`server.mjs`):** Nuevo `POST /api/images/:id/upscale-client` que recibe el blob PNG producido por ESRGAN en el navegador (multipart) y lo persiste como nueva versión mejorada. Esto garantiza que el resultado de la súper-resolución client-side sobreviva a recargas y sea descargable.
+- **Scripts UpscalerJS en el Frontend (`public/index.html`):** Carga vía CDN (jsDelivr) de `@tensorflow/tfjs`, `@upscalerjs/esrgan-slim@latest` (modelo 2x) y `upscaler` (UMD), expuestos como globales `tf`, `ESRGANSlim2x` y `Upscaler`.
+- **Texto Dinámico del Spinner (`public/index.html`):** El contenedor `enhance-loading` ahora muestra mensajes contextuales según la fase ("Procesando imagen con Sharp...", "Mejorando resolución con IA (ESRGAN 2x)…", "Mejorando resolución (Lanczos en servidor)...").
+- **Logging Detallado de SR (`public/app.js`):** Trazas `[SR]` en la consola del navegador para diagnosticar el flujo de súper-resolución: inicialización de TF, backend seleccionado, carga del modelo, progreso por parches, tiempo de ejecución, dimensiones resultantes y persistencia.
+
+### Fixed
+- **Feedback Confuso en Súper-Resolución:** El toast "Imagen mejorada correctamente" ya no se muestra dos veces; ahora se muestra una sola vez al final del proceso completo (incluyendo el upscale). El spinner muestra claramente la fase actual con porcentaje de progreso de ESRGAN.
+- **Resultado ESRGAN Efímero:** El resultado de ESRGAN (data URL) ahora se persiste al servidor vía `POST /api/images/:id/upscale-client`, de modo que sobrevive a recargas de página y es descargable.
+- **Fallback Lanczos No Escalaba Imágenes > 1600px:** El guard `maxWidth: 1600` heredado del pipeline original impedía que el fallback escalara imágenes que ya eran grandes. Ahora `upscaleLanczos()` usa `maxWidth: Infinity` por defecto, por lo que siempre aplica el factor solicitado.
+
 ## [1.4.4] - 2026-07-05
 
 ### Added

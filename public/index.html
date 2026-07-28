@@ -395,7 +395,7 @@
                   </div>
                   <div id="enhance-loading" class="spinner-container hidden">
                     <div class="spinner"></div>
-                    <p>Procesando imagen con Sharp...</p>
+                    <p id="enhance-loading-text">Procesando imagen con Sharp...</p>
                   </div>
                 </div>
               </div>
@@ -534,6 +534,11 @@
   </div>
 
   <!-- Custom Script -->
+  <!-- TensorFlow.js + UpscalerJS (ESRGAN Slim 2x) for client-side super-resolution -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@upscalerjs/esrgan-slim@latest/dist/umd/2x.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/upscaler@latest/dist/browser/umd/upscaler.min.js"></script>
+  <!-- Main app -->
   <script src="app.js"></script>
 </body>
 </html>

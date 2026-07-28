@@ -10,11 +10,12 @@ import { Writable } from 'stream';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
+import sharp from 'sharp';
 
 // Import local helper modules
 import { initDb, run, get, all, getFileHash } from './db.mjs';
 import { analyzeImage, getAvailableVisionModel, getInstalledVisionModels } from './ollama.mjs';
-import { enhanceImage, getImageMetadata } from './imageProcessor.mjs';
+import { enhanceImage, getImageMetadata, upscaleLanczos } from './imageProcessor.mjs';
 import { calculatePreferencesProfile, getOffsetsFromProfile, applyLearnedOffsets, getLearnedOffsets } from './preferencesLearner.mjs';
 
 dotenv.config();
@@ -126,7 +127,7 @@ fastify.register(fastifySession, {
 // Register multipart support for file uploads
 fastify.register(fastifyMultipart, {
   limits: {
-    fileSize: 15 * 1024 * 1024 // 15MB limit
+    fileSize: 50 * 1024 * 1024 // 50MB limit (AI-upscaled PNGs can be large)
   }
 });
 
@@ -549,11 +550,16 @@ fastify.post('/api/images/:id/enhance', { preHandler: requireAuth }, async (requ
       saturation: targetAdjustments.saturation !== undefined ? parseFloat(targetAdjustments.saturation) : 1.0,
       sharpness: targetAdjustments.sharpness !== undefined ? parseFloat(targetAdjustments.sharpness) : 0,
       denoise: targetAdjustments.denoise !== undefined ? !!targetAdjustments.denoise : false,
-      upscale: targetAdjustments.upscale !== undefined ? !!targetAdjustments.upscale : false,
+      // `upscale` is intentionally NOT passed to enhanceImage — super-resolution is
+      // delegated to the client (UpscalerJS). We still record the user's intent so
+      // the frontend knows whether to trigger the client-side upscaler.
       rotate: userAdjustments.rotate !== undefined ? parseInt(userAdjustments.rotate) : (aiAdjustments.rotate !== undefined ? parseInt(aiAdjustments.rotate) : 0),
       temperature: targetAdjustments.temperature !== undefined ? parseFloat(targetAdjustments.temperature) : 1.0,
       tint: targetAdjustments.tint !== undefined ? parseFloat(targetAdjustments.tint) : 1.0
     };
+
+    // Determine whether the client should attempt an AI upscale after this enhancement
+    const wantsUpscale = targetAdjustments.upscale !== undefined ? !!targetAdjustments.upscale : false;
 
     const ext = path.extname(image.filename) || '.jpg';
     const baseName = path.basename(image.filename, ext);
@@ -597,13 +603,168 @@ fastify.post('/api/images/:id/enhance', { preHandler: requireAuth }, async (requ
         enhanced_url: `/uploads/enhanced/${enhancedFilename}`,
         enhanced_width: outputMeta.width,
         enhanced_height: outputMeta.height,
-        enhanced_size: outputMeta.size
+        enhanced_size: outputMeta.size,
+        // Super-resolution is delegated to the client. The frontend will use these
+        // flags to decide whether to invoke UpscalerJS (ESRGAN) on the enhanced image.
+        ai_upscale_recommendation: wantsUpscale,
+        upscaled_by: null
       }
     };
 
   } catch (err) {
     fastify.log.error(err);
     return reply.status(500).send({ error: `Error al mejorar la imagen: ${err.message}` });
+  }
+});
+
+// POST /api/images/:id/upscale (server-side Lanczos fallback for super-resolution)
+// Body (optional): { "scale": 2, "maxWidth": 1600 }
+// This route is used by the frontend as a fallback when UpscalerJS cannot run
+// client-side (e.g. no WebGL, model failed to load). It applies a classic 2x
+// Lanczos resize to the existing enhanced image (or the original if no enhanced
+// version exists yet) and updates the DB record accordingly.
+fastify.post('/api/images/:id/upscale', { preHandler: requireAuth }, async (request, reply) => {
+  const imageId = request.params.id;
+  const { scale = 2, maxWidth = 1600 } = request.body || {};
+
+  try {
+    const image = await get('SELECT * FROM images WHERE id = ? AND user_id = ?', [imageId, request.session.userId]);
+    if (!image) {
+      return reply.status(404).send({ error: 'Imagen no encontrada.' });
+    }
+
+    // Operate on the enhanced version if it exists; otherwise on the original.
+    const sourcePath = (image.enhanced_filepath && fs.existsSync(image.enhanced_filepath))
+      ? image.enhanced_filepath
+      : image.filepath;
+
+    const ext = path.extname(image.filename) || '.jpg';
+    const baseName = path.basename(image.filename, ext);
+    const upscaledFilename = `${baseName}_upscaled_${Date.now()}${ext}`;
+    const upscaledFilepath = path.join(enhancedDir, upscaledFilename);
+
+    const outputMeta = await upscaleLanczos(sourcePath, upscaledFilepath, {
+      scale: parseInt(scale, 10),
+      maxWidth: parseInt(maxWidth, 10)
+    });
+
+    // Persist as the new enhanced version (replaces previous enhanced entry)
+    await run(
+      'UPDATE images SET status = ?, enhanced_filepath = ?, enhanced_filename = ?, applied_adjustments = ? WHERE id = ?',
+      ['enhanced', upscaledFilepath, upscaledFilename, JSON.stringify({ ...(image.applied_adjustments ? JSON.parse(image.applied_adjustments) : {}), upscale: true, upscaled_by: 'server' }), imageId]
+    );
+
+    return {
+      success: true,
+      image: {
+        id: image.id,
+        filename: image.filename,
+        original_name: image.original_name,
+        size: image.size,
+        status: 'enhanced',
+        captured_at: image.captured_at,
+        gps_latitude: image.gps_latitude,
+        gps_longitude: image.gps_longitude,
+        camera_make: image.camera_make,
+        camera_model: image.camera_model,
+        lens_model: image.lens_model,
+        fnumber: image.fnumber,
+        exposure_time: image.exposure_time,
+        iso: image.iso,
+        focal_length: image.focal_length,
+        focal_length_35mm: image.focal_length_35mm,
+        flash: image.flash,
+        white_balance: image.white_balance,
+        software: image.software,
+        artist: image.artist,
+        original_url: `/uploads/originals/${image.filename}`,
+        enhanced_url: `/uploads/enhanced/${upscaledFilename}`,
+        enhanced_width: outputMeta.width,
+        enhanced_height: outputMeta.height,
+        enhanced_size: outputMeta.size,
+        ai_upscale_recommendation: true,
+        upscaled_by: 'server'
+      }
+    };
+
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send({ error: `Error al escalar la imagen: ${err.message}` });
+  }
+});
+
+// POST /api/images/:id/upscale-client (persist AI-upscaled blob from the browser)
+// Multipart body: { image: \u003cblob\u003e, source_width: number, source_height: number }
+// The frontend runs UpscalerJS (ESRGAN 2x) client-side and uploads the result here
+// so it gets persisted as the new enhanced version (survives reloads, downloadable).
+fastify.post('/api/images/:id/upscale-client', { preHandler: requireAuth }, async (request, reply) => {
+  const imageId = request.params.id;
+
+  try {
+    const image = await get('SELECT * FROM images WHERE id = ? AND user_id = ?', [imageId, request.session.userId]);
+    if (!image) {
+      return reply.status(404).send({ error: 'Imagen no encontrada.' });
+    }
+
+    const data = await request.file();
+    if (!data) {
+      return reply.status(400).send({ error: 'No se ha proporcionado ninguna imagen.' });
+    }
+
+    const ext = path.extname(image.filename) || '.jpg';
+    const baseName = path.basename(image.filename, ext);
+    const upscaledFilename = `${baseName}_upscaled_${Date.now()}.png`;
+    const upscaledFilepath = path.join(enhancedDir, upscaledFilename);
+
+    // Stream the uploaded blob to disk
+    await pipeline(data.file, fs.createWriteStream(upscaledFilepath));
+
+    // Read dimensions of the saved file via Sharp
+    const meta = await sharp(upscaledFilepath).metadata();
+    const stats = await fs.promises.stat(upscaledFilepath);
+
+    // Persist as the new enhanced version
+    await run(
+      'UPDATE images SET status = ?, enhanced_filepath = ?, enhanced_filename = ?, applied_adjustments = ? WHERE id = ?',
+      ['enhanced', upscaledFilepath, upscaledFilename, JSON.stringify({ ...(image.applied_adjustments ? JSON.parse(image.applied_adjustments) : {}), upscale: true, upscaled_by: 'client' }), imageId]
+    );
+
+    return {
+      success: true,
+      image: {
+        id: image.id,
+        filename: image.filename,
+        original_name: image.original_name,
+        size: image.size,
+        status: 'enhanced',
+        captured_at: image.captured_at,
+        gps_latitude: image.gps_latitude,
+        gps_longitude: image.gps_longitude,
+        camera_make: image.camera_make,
+        camera_model: image.camera_model,
+        lens_model: image.lens_model,
+        fnumber: image.fnumber,
+        exposure_time: image.exposure_time,
+        iso: image.iso,
+        focal_length: image.focal_length,
+        focal_length_35mm: image.focal_length_35mm,
+        flash: image.flash,
+        white_balance: image.white_balance,
+        software: image.software,
+        artist: image.artist,
+        original_url: `/uploads/originals/${image.filename}`,
+        enhanced_url: `/uploads/enhanced/${upscaledFilename}`,
+        enhanced_width: meta.width,
+        enhanced_height: meta.height,
+        enhanced_size: stats.size,
+        ai_upscale_recommendation: true,
+        upscaled_by: 'client'
+      }
+    };
+
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send({ error: `Error al guardar la imagen escalada: ${err.message}` });
   }
 });
 
