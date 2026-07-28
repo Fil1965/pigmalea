@@ -227,6 +227,18 @@
               <i class="fa-solid fa-arrow-left"></i> Volver a mis fotos
             </button>
             <h1 id="workspace-title">Mesa de Trabajo IA</h1>
+            <div class="workspace-nav-buttons">
+              <button id="btn-prev-image" class="btn-nav" onclick="navigateImage(-1)" title="Imagen anterior">
+                <i class="fa-solid fa-chevron-left"></i>
+              </button>
+              <span id="workspace-image-counter" class="workspace-image-counter"></span>
+              <button id="btn-next-image" class="btn-nav" onclick="navigateImage(1)" title="Imagen siguiente">
+                <i class="fa-solid fa-chevron-right"></i>
+              </button>
+              <button id="btn-delete-image" class="btn-nav btn-nav-delete" onclick="deleteCurrentImage()" title="Eliminar imagen">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
           </div>
 
           <div class="workspace-layout">

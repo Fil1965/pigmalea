@@ -9,7 +9,8 @@ const state = {
   selectedFiles: [],
   selectedImageIds: [],
   galleryFilter: 'all', // 'all' | 'enhanced' | 'unprocessed'
-  gallerySearch: ''
+  gallerySearch: '',
+  comparisonSliderPos: 50 // Position (%) of the before/after comparison slider
 };
 
 // Default adjustment parameters (neutral values)
@@ -816,7 +817,7 @@ function escapeHtml(text) {
 // ==========================================================================
 // Workspace Panel (Compare, AI & Edit) Handlers
 // ==========================================================================
-function openWorkspace(imageId) {
+function openWorkspace(imageId, preserveSlider = false) {
   const image = state.images.find(img => img.id === imageId);
   if (!image) return;
 
@@ -843,8 +844,13 @@ function openWorkspace(imageId) {
     document.getElementById('btn-dl-enhanced').href = image.enhanced_url;
     document.getElementById('btn-copy-enhanced').classList.remove('hidden');
 
-    // Reset Slider bar positions to center
-    resetSliderHandle();
+    // Apply slider position: preserve when navigating between images, reset when opening from gallery
+    if (preserveSlider) {
+      applySliderHandle(state.comparisonSliderPos);
+    } else {
+      resetSliderHandle();
+      state.comparisonSliderPos = 50;
+    }
   } else {
     document.getElementById('image-slider-wrapper').classList.remove('active');
     document.getElementById('single-image-wrapper').classList.remove('hidden');
@@ -927,7 +933,75 @@ function openWorkspace(imageId) {
   // Actualizar visualización del banner y botones de aprendizaje
   updateLearningUIState(image, usingLearning);
 
+  // Actualizar botones de navegación entre imágenes
+  updateWorkspaceNavButtons();
+
   navigateTo('workspace');
+}
+
+function navigateImage(direction) {
+  if (!state.currentImage || state.images.length === 0) return;
+
+  const currentIdx = state.images.findIndex(img => img.id === state.currentImage.id);
+  if (currentIdx === -1) return;
+
+  const newIdx = currentIdx + direction;
+  if (newIdx < 0 || newIdx >= state.images.length) return;
+
+  openWorkspace(state.images[newIdx].id, true);
+}
+
+async function deleteCurrentImage() {
+  if (!state.currentImage) return;
+  const imageId = state.currentImage.id;
+  const imageName = state.currentImage.original_name;
+
+  if (!confirm(`¿Estás seguro de que quieres eliminar "${imageName}" y todas sus optimizaciones?`)) return;
+
+  try {
+    const res = await fetch(`/api/images/${imageId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    // Remove from selection if present
+    state.selectedImageIds = state.selectedImageIds.filter(x => x !== imageId);
+
+    // Remove from images array and determine next image to show
+    const currentIdx = state.images.findIndex(img => img.id === imageId);
+    state.images = state.images.filter(img => img.id !== imageId);
+
+    showToast('Imagen eliminada correctamente.', 'success');
+
+    if (state.images.length === 0) {
+      // No images left, go back to gallery
+      state.currentImage = null;
+      navigateTo('gallery');
+    } else {
+      // Navigate to the next image (or previous if we deleted the last one)
+      const nextIdx = Math.min(currentIdx, state.images.length - 1);
+      openWorkspace(state.images[nextIdx].id, true);
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function updateWorkspaceNavButtons() {
+  const currentIdx = state.images.findIndex(img => img.id === state.currentImage?.id);
+  const btnPrev = document.getElementById('btn-prev-image');
+  const btnNext = document.getElementById('btn-next-image');
+  const counter = document.getElementById('workspace-image-counter');
+
+  if (currentIdx === -1 || state.images.length === 0) {
+    btnPrev.disabled = true;
+    btnNext.disabled = true;
+    counter.textContent = '';
+    return;
+  }
+
+  counter.textContent = `${currentIdx + 1} / ${state.images.length}`;
+  btnPrev.disabled = currentIdx === 0;
+  btnNext.disabled = currentIdx === state.images.length - 1;
 }
 
 function renderAIAnalysis(analysis) {
@@ -1187,6 +1261,9 @@ function initSliderDrag() {
     // We override width structure for top layer using modern CSS clip-path to prevent distortion!
     afterContainer.style.width = '100%';
     afterContainer.style.clipPath = `inset(0 0 0 ${percentage}%)`;
+
+    // Track the slider position so it can be preserved when navigating between images
+    state.comparisonSliderPos = percentage;
   };
 
   handle.addEventListener('mousedown', (e) => {
@@ -1211,6 +1288,16 @@ function resetSliderHandle() {
     handle.style.left = '50%';
     afterContainer.style.width = '100%';
     afterContainer.style.clipPath = 'inset(0 0 0 50%)';
+  }
+}
+
+function applySliderHandle(percentage) {
+  const handle = document.getElementById('slider-handle');
+  const afterContainer = document.getElementById('image-after-container');
+  if (handle && afterContainer) {
+    handle.style.left = `${percentage}%`;
+    afterContainer.style.width = '100%';
+    afterContainer.style.clipPath = `inset(0 0 0 ${percentage}%)`;
   }
 }
 
