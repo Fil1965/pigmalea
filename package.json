@@ -1,7 +1,7 @@
 {
   "name": "pigmalea",
-  "version": "1.5.0",
-  "description": "AI-Assisted Image Enhancer with client-side super-resolution (UpscalerJS / ESRGAN).",
+  "version": "1.4.4",
+  "description": "",
   "main": "server.mjs",
   "scripts": {
     "start": "node server.mjs",
