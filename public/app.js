@@ -742,6 +742,13 @@ function resetUploadZone() {
   document.getElementById('file-input').value = '';
   document.getElementById('upload-status-card').classList.add('hidden');
   document.getElementById('upload-thumbnail').src = '';
+
+  // Restore the upload button to its initial state (it may have been
+  // disabled and relabelled by a previous performUpload run).
+  const btn = document.getElementById('start-upload-btn');
+  const txt = document.getElementById('upload-btn-text');
+  if (btn) btn.disabled = false;
+  if (txt) txt.textContent = 'Subir Imagen';
 }
 
 async function performUpload() {
@@ -768,6 +775,10 @@ async function performUpload() {
 
     const uploadedCount = data.images ? data.images.length : 0;
     const duplicates = data.duplicates || [];
+
+    // Restore the upload button so it works on the next upload session
+    btn.disabled = false;
+    txt.textContent = 'Subir Imagen';
 
     if (uploadedCount > 0) {
       showToast(uploadedCount === 1 ? 'Imagen subida correctamente.' : `${uploadedCount} imágenes subidas correctamente.`, 'success');

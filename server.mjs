@@ -36,13 +36,47 @@ if (!fs.existsSync(enhancedDir)) fs.mkdirSync(enhancedDir);
 const logFile = path.join(__dirname, 'server.log');
 const logFileStream = fs.createWriteStream(logFile, { flags: 'a' });
 
+// Track which reqIds belong to API requests so we can suppress
+// the noisy static file request/response log entries.
+const apiReqIds = new Set();
+
 const customLoggerStream = new Writable({
   write(chunk, encoding, callback) {
     const rawLine = chunk.toString();
-    logFileStream.write(rawLine);
 
     try {
       const log = JSON.parse(rawLine.trim());
+
+      // Track API request IDs from incoming request logs
+      if (log.req) {
+        const url = log.req.url || '';
+        if (url.startsWith('/api/')) {
+          apiReqIds.add(log.reqId);
+        }
+      }
+
+      // Suppress info-level noise from static file requests (non-API routes)
+      // Only filter "incoming request" and "request completed" at info level;
+      // always keep warnings, errors and other messages.
+      if (log.level === 30) {
+        const isStaticIncoming = log.req && !(log.req.url || '').startsWith('/api/');
+        const isStaticCompleted = log.res && log.reqId && !apiReqIds.has(log.reqId);
+        if (isStaticIncoming || isStaticCompleted) {
+          if (log.res && log.reqId) apiReqIds.delete(log.reqId);
+          callback();
+          return;
+        }
+      }
+
+      // Clean up tracked reqIds after response is logged
+      if (log.res && log.reqId) {
+        apiReqIds.delete(log.reqId);
+      }
+
+      // Write raw JSON to file log
+      logFileStream.write(rawLine);
+
+      // Format for console output
       const date = new Date(log.time || Date.now()).toLocaleTimeString();
       
       let levelName = 'INFO';
