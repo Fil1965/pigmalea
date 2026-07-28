@@ -6,6 +6,19 @@ All notable changes to the Pigmalea project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-28
+
+### Changed
+- **Reducción de Ruido Adaptativa (`imageProcessor.mjs`, `ollama.mjs`, `public/`):** El parámetro `denoise` pasa de ser un booleano on/off a un nivel continuo de `0.0` (sin ruido) a `1.0` (ruido severo). Esto permite graduar la intensidad de la limpieza según el diagnóstico de la IA o el ajuste manual del usuario. La compatibilidad con valores booleanos antiguos (`true`/`false`) se mantiene en todos los niveles (backend, IA, frontend y ajustes guardados en localStorage).
+
+### Added
+- **Denoise Adaptativo en Pipeline (`imageProcessor.mjs`):** El paso 3 del pipeline ahora usa un filtro de mediana con radio dinámico (1-5) escalado por el nivel de ruido. Para ruido moderado-pesado (`> 0.3`), se añade un desenfoque gaussiano suave con sigma proporcional al nivel de ruido, que suaviza el ruido en zonas planas sin destruir bordes (el paso de nitidez posterior re-nitida los bordes sin amplificar el ruido ya limpio).
+- **Heurística ISO → Denoise en el Prompt (`ollama.mjs`):** Las reglas de contexto EXIF ahora mapean rangos de ISO a niveles de `denoise`: ISO \u003e 3200 → 0.8-1.0, ISO \u003e 1600 → 0.5-0.8, ISO \u003c 400 → 0.0 salvo ruido visible. El modelo de visión ahora devuelve `denoise` como número en lugar de booleano.
+- **Slider de Reducción de Ruido (`public/index.html`):** Sustituye el checkbox "Reducir Ruido" por un deslizador continuo de 0.00 a 1.00, alineado con el resto de controles de ajuste.
+
+### Fixed
+- **Compatibilidad Retroactiva de Denoise:** Los ajustes guardados en `localStorage` y en la BD con `denoise: true/false` se normalizan automáticamente a `0.5/0.0` al cargar, sin pérdida de datos.
+
 ## [1.4.4] - 2026-07-05
 
 ### Added

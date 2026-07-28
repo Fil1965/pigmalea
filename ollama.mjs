@@ -248,7 +248,7 @@ export async function analyzeImage(filePath, selectedModel = null, keepAlive = n
     // 2.1 Optional EXIF capture context for better adjustment recommendations
     const exifContext = await getExifContext(filePath);
     const exifBlock = exifContext
-      ? `\n\n=== Capture context (EXIF) ===\n${exifContext}\n\nUse this capture context to inform your recommendations.\n- If ISO is high, prefer denoise and avoid aggressive sharpen.\n- If shutter is slow, avoid boosting micro-contrast too aggressively.\n- If flash fired or white balance appears off, prioritize temperature/tint corrections.\n`
+      ? `\n\n=== Capture context (EXIF) ===\n${exifContext}\n\nUse this capture context to inform your recommendations.\n- If ISO is high (above 1600), set denoise to 0.5-0.8 and avoid aggressive sharpen.\n- If ISO is very high (above 3200), set denoise to 0.8-1.0 and keep sharpness below 1.5.\n- If shutter is slow (below 1/30s), avoid boosting micro-contrast too aggressively.\n- If flash fired or white balance appears off, prioritize temperature/tint corrections.\n- For clean, low-ISO images (below 400), set denoise to 0.0 unless visible noise is apparent.\n`
       : '';
 
     // 3. Prepare prompt
@@ -265,7 +265,7 @@ You must return a JSON object. The response must follow this EXACT schema:
     "contrast": 1.0,    // Suggested contrast multiplier. Range: 0.5 to 2.0 (1.0 is no change)
     "saturation": 1.0,  // Suggested saturation multiplier. Range: 0.0 to 2.0 (1.0 is no change)
     "sharpness": 0.0,   // Suggested sharpening amount. Range: 0.0 to 5.0 (0.0 is no change)
-    "denoise": false,   // Whether a denoise/blur operation is recommended
+    "denoise": 0.0,   // Noise reduction level. Range: 0.0 (none) to 1.0 (heavy). Use 0.0 for clean images, 0.3-0.5 for moderate noise (high ISO, low light), 0.6-1.0 for severe noise (very high ISO, compressed artifacts, heavy grain). This controls an adaptive pipeline: dynamic median filter + edge-preserving blur.
     "upscale": true,    // Whether upscaling is recommended
     "rotate": 0,        // Suggested rotation angle clockwise in degrees if the image is sideways or upside down. Allowed values: 0, 90, 180, 270 (0 is no change)
     "temperature": 1.0, // Suggested color temperature multiplier to correct white balance. Range: 0.5 to 1.5. (1.0 is no change, < 1.0 is cooler/blue, > 1.0 is warmer/orange)
@@ -329,13 +329,23 @@ Do not include any text outside the JSON object. Do not include markdown code bl
         contrast: 1.0,
         saturation: 1.0,
         sharpness: 0.0,
-        denoise: false,
+        denoise: 0.0,
         upscale: true,
         rotate: 0,
         temperature: 1.0,
         tint: 1.0
       };
     } else {
+      // Normalize denoise: accept boolean (backwards compat with older model output) or number
+      if (parsedResult.adjustments.denoise === undefined) {
+        parsedResult.adjustments.denoise = 0.0;
+      } else if (typeof parsedResult.adjustments.denoise === 'boolean') {
+        parsedResult.adjustments.denoise = parsedResult.adjustments.denoise ? 0.5 : 0.0;
+      } else {
+        // Clamp to valid range
+        const d = parseFloat(parsedResult.adjustments.denoise);
+        parsedResult.adjustments.denoise = isNaN(d) ? 0.0 : Math.max(0, Math.min(1, d));
+      }
       if (parsedResult.adjustments.temperature === undefined) {
         parsedResult.adjustments.temperature = 1.0;
       }

@@ -548,7 +548,12 @@ fastify.post('/api/images/:id/enhance', { preHandler: requireAuth }, async (requ
       contrast: targetAdjustments.contrast !== undefined ? parseFloat(targetAdjustments.contrast) : 1.0,
       saturation: targetAdjustments.saturation !== undefined ? parseFloat(targetAdjustments.saturation) : 1.0,
       sharpness: targetAdjustments.sharpness !== undefined ? parseFloat(targetAdjustments.sharpness) : 0,
-      denoise: targetAdjustments.denoise !== undefined ? !!targetAdjustments.denoise : false,
+      // Normalize denoise: accept boolean (backwards compat) or number 0.0-1.0
+      denoise: targetAdjustments.denoise !== undefined
+        ? (typeof targetAdjustments.denoise === 'boolean'
+            ? (targetAdjustments.denoise ? 0.5 : 0.0)
+            : Math.max(0, Math.min(1, parseFloat(targetAdjustments.denoise) || 0)))
+        : 0,
       upscale: targetAdjustments.upscale !== undefined ? !!targetAdjustments.upscale : false,
       rotate: userAdjustments.rotate !== undefined ? parseInt(userAdjustments.rotate) : (aiAdjustments.rotate !== undefined ? parseInt(aiAdjustments.rotate) : 0),
       temperature: targetAdjustments.temperature !== undefined ? parseFloat(targetAdjustments.temperature) : 1.0,

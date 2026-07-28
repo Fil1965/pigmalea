@@ -369,12 +369,17 @@
                     </select>
                   </div>
 
+                  <!-- Reducción de Ruido (slider) -->
+                  <div class="control-group">
+                    <div class="control-label">
+                      <span>Reducción de Ruido</span>
+                      <span id="val-denoise">0.00</span>
+                    </div>
+                    <input type="range" id="slider-denoise" min="0.0" max="1.0" step="0.05" value="0" oninput="updateSliderVal('denoise', this.value)">
+                  </div>
+
                   <!-- Toggles -->
                   <div class="toggle-row">
-                    <label class="toggle-control">
-                      <input type="checkbox" id="check-denoise">
-                      <span class="toggle-label">Reducir Ruido</span>
-                    </label>
                     <label class="toggle-control">
                       <input type="checkbox" id="check-upscale" checked>
                       <span class="toggle-label">Súper-Resolución (2x)</span>

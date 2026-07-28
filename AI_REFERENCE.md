@@ -46,7 +46,7 @@ You must return a JSON object. The response must follow this EXACT schema:
     "contrast": 1.0,    // Suggested contrast multiplier. Range: 0.5 to 2.0 (1.0 is no change)
     "saturation": 1.0,  // Suggested saturation multiplier. Range: 0.0 to 2.0 (1.0 is no change)
     "sharpness": 0.0,   // Suggested sharpening amount. Range: 0.0 to 5.0 (0.0 is no change)
-    "denoise": false,   // Whether a denoise/blur operation is recommended
+    "denoise": 0.0,   // Noise reduction level. Range: 0.0 (none) to 1.0 (heavy). Based on ISO and visible noise.
     "upscale": true,    // Whether upscaling is recommended
     "rotate": 0,        // Suggested rotation angle clockwise in degrees if the image is sideways or upside down. Allowed values: 0, 90, 180, 270 (0 is no change)
     "temperature": 1.0,   // Suggested color temperature multiplier to correct white balance. Range: 0.5 to 1.5. (1.0 is no change, < 1.0 is cooler/blue, > 1.0 is warmer/orange)
@@ -74,7 +74,7 @@ Do not include any text outside the JSON object. Do not include markdown code bl
     "contrast": 0.95,
     "saturation": 1.0,
     "sharpness": 1.8,
-    "denoise": true,
+    "denoise": 0.6,
     "upscale": true,
     "rotate": 0,
     "temperature": 0.95,
@@ -118,11 +118,22 @@ Una vez obtenidas las directrices de la IA (o personalizadas por el usuario), el
     ```
 
 ### 2. Reducción de Ruido (Denoise)
-*   **Parámetro IA:** `adjustments.denoise` (booleano)
-*   **Mapeo Sharp:** Si es verdadero, se aplica un filtro de mediana con un radio de `3px` para filtrar el ruido conservando la definición geométrica general.
+*   **Parámetro IA:** `adjustments.denoise` (rango: `0.0` a `1.0`, donde `0.0` es sin reducción y `1.0` es reducción máxima). Acepta booleanos por compatibilidad retroactiva (`true` = `0.5`, `false` = `0.0`).
+*   **Mapeo Sharp — pipeline adaptativo:**
+    1. **Filtro de mediana dinámico:** radio escalado por el nivel de ruido: `radius = round(1 + denoise * 4)` → rango 1-5. Elimina ruido sal/pimienta e impulsivo preservando bordes.
+    2. **Blur gaussiano suave (solo para `denoise > 0.3`):** sigma = `0.3 + (denoise - 0.3) * 1.5` → rango 0.3-1.35. Suaviza ruido residual en zonas planas; el paso de nitidez posterior (8) re-nitida los bordes sin amplificar el ruido ya limpio.
+*   **Heurística ISO (inyectada en el prompt vía EXIF):**
+    - ISO > 3200 → `denoise` 0.8-1.0
+    - ISO > 1600 → `denoise` 0.5-0.8
+    - ISO < 400 → `denoise` 0.0 (salvo ruido visible)
 *   **Código:**
     ```javascript
-    pipeline = pipeline.median(3);
+    const medianRadius = Math.max(1, Math.round(1 + denoiseLevel * 4));
+    pipeline = pipeline.median(medianRadius);
+    if (denoiseLevel > 0.3) {
+      const blurSigma = 0.3 + (denoiseLevel - 0.3) * 1.5;
+      pipeline = pipeline.blur(blurSigma);
+    }
     ```
 
 ### 3. Temperatura de Color (Temperature)

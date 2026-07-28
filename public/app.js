@@ -19,7 +19,7 @@ const DEFAULT_ADJUSTMENTS = {
   contrast: 1.0,
   saturation: 1.0,
   sharpness: 0,
-  denoise: false,
+  denoise: 0,
   upscale: true,
   rotate: 0,
   temperature: 1.0,
@@ -1116,7 +1116,7 @@ async function enhanceImage() {
     contrast: parseFloat(document.getElementById('slider-contrast').value),
     saturation: parseFloat(document.getElementById('slider-saturation').value),
     sharpness: parseFloat(document.getElementById('slider-sharpness').value),
-    denoise: document.getElementById('check-denoise').checked,
+    denoise: parseFloat(document.getElementById('slider-denoise').value),
     upscale: document.getElementById('check-upscale').checked,
     rotate: parseInt(document.getElementById('select-rotate').value),
     temperature: parseFloat(document.getElementById('slider-temperature').value),
@@ -1189,7 +1189,13 @@ function setSlidersValues(adjustments) {
   document.getElementById('slider-tint').value = defaults.tint;
   updateSliderVal('tint', defaults.tint, true);
 
-  document.getElementById('check-denoise').checked = !!defaults.denoise;
+  // Normalize denoise: accept boolean (backwards compat from old saved data) or number
+  const denoiseVal = typeof defaults.denoise === 'boolean'
+    ? (defaults.denoise ? 0.5 : 0.0)
+    : (parseFloat(defaults.denoise) || 0.0);
+  document.getElementById('slider-denoise').value = denoiseVal;
+  updateSliderVal('denoise', denoiseVal, true);
+
   document.getElementById('check-upscale').checked = !!defaults.upscale;
   document.getElementById('select-rotate').value = defaults.rotate !== undefined ? defaults.rotate : 0;
 }
@@ -1213,7 +1219,7 @@ function copyCurrentAdjustments() {
     temperature: parseFloat(document.getElementById('slider-temperature').value),
     tint: parseFloat(document.getElementById('slider-tint').value),
     rotate: parseInt(document.getElementById('select-rotate').value, 10),
-    denoise: document.getElementById('check-denoise').checked,
+    denoise: parseFloat(document.getElementById('slider-denoise').value),
     upscale: document.getElementById('check-upscale').checked
   };
 
@@ -1611,11 +1617,11 @@ function initLearningListeners() {
     if (banner) banner.classList.add('hidden');
   };
 
-  const denoise = document.getElementById('check-denoise');
+  const denoise = document.getElementById('slider-denoise');
   const upscale = document.getElementById('check-upscale');
   const rotate = document.getElementById('select-rotate');
 
-  if (denoise) denoise.addEventListener('change', hideBanner);
+  if (denoise) denoise.addEventListener('input', hideBanner);
   if (upscale) upscale.addEventListener('change', hideBanner);
   if (rotate) rotate.addEventListener('change', hideBanner);
 }
