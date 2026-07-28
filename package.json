@@ -1,6 +1,6 @@
 {
   "name": "pigmalea",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "AI-Assisted Image Enhancer with adaptive denoising.",
   "main": "server.mjs",
   "scripts": {

@@ -119,22 +119,21 @@ Una vez obtenidas las directrices de la IA (o personalizadas por el usuario), el
 
 ### 2. Reducción de Ruido (Denoise)
 *   **Parámetro IA:** `adjustments.denoise` (rango: `0.0` a `1.0`, donde `0.0` es sin reducción y `1.0` es reducción máxima). Acepta booleanos por compatibilidad retroactiva (`true` = `0.5`, `false` = `0.0`).
-*   **Mapeo Sharp — pipeline adaptativo:**
+*   **Mapeo Sharp — pipeline adaptativo de 3 etapas:**
     1. **Filtro de mediana dinámico:** radio escalado por el nivel de ruido: `radius = round(1 + denoise * 4)` → rango 1-5. Elimina ruido sal/pimienta e impulsivo preservando bordes.
-    2. **Blur gaussiano suave (solo para `denoise > 0.3`):** sigma = `0.3 + (denoise - 0.3) * 1.5` → rango 0.3-1.35. Suaviza ruido residual en zonas planas; el paso de nitidez posterior (8) re-nitida los bordes sin amplificar el ruido ya limpio.
+    2. **Separación de frecuencias** (`denoise > 0.25`): crea capa "base" (blur gaussiano con sigma = `1 + denoise * 3`), extrae capa "detalle" (original - base), atenua los residuos de baja magnitud (ruido) con un umbral proporcional al nivel de ruido, y recompone `base + detalle_atenuado`. Preserva bordes reales.
+    3. **Denoise selectivo por luminancia** (`denoise > 0.15`): convierte a Y (Rec. 709), aplica mediana + blur gaussiano solo al canal Y, y recompone con el color original. El ruido digital vive principalmente en la luminancia, por lo que esto limpia el ruido sin degradar el color.
+*   **Detección automática de ruido** (`estimateNoiseLevel()`): si no hay análisis de IA ni ajuste manual, el servidor estima el nivel de ruido calculando la desviación absoluta mediana (MAD) del residuo high-pass sobre una versión 256px. Mapea sigma < 1.5 → 0.0, sigma > 12 → 1.0.
 *   **Heurística ISO (inyectada en el prompt vía EXIF):**
     - ISO > 3200 → `denoise` 0.8-1.0
     - ISO > 1600 → `denoise` 0.5-0.8
     - ISO < 400 → `denoise` 0.0 (salvo ruido visible)
-*   **Código:**
+*   **Código (etapa 1, mediana):**
     ```javascript
     const medianRadius = Math.max(1, Math.round(1 + denoiseLevel * 4));
     pipeline = pipeline.median(medianRadius);
-    if (denoiseLevel > 0.3) {
-      const blurSigma = 0.3 + (denoiseLevel - 0.3) * 1.5;
-      pipeline = pipeline.blur(blurSigma);
-    }
     ```
+*   **Código (etapas 2-3, raw buffers):** Las etapas de separación de frecuencias y luminancia operan sobre buffers raw de píxeles extraídos del pipeline y se reintroducen con `sharp(buffer, { raw: { width, height, channels } })`.
 
 ### 3. Temperatura de Color (Temperature)
 *   **Parámetro IA:** `adjustments.temperature` (rango: `0.5` a `1.5`, `1.0` neutro)

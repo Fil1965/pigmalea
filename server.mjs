@@ -14,7 +14,7 @@ import dotenv from 'dotenv';
 // Import local helper modules
 import { initDb, run, get, all, getFileHash } from './db.mjs';
 import { analyzeImage, getAvailableVisionModel, getInstalledVisionModels } from './ollama.mjs';
-import { enhanceImage, getImageMetadata } from './imageProcessor.mjs';
+import { enhanceImage, getImageMetadata, estimateNoiseLevel } from './imageProcessor.mjs';
 import { calculatePreferencesProfile, getOffsetsFromProfile, applyLearnedOffsets, getLearnedOffsets } from './preferencesLearner.mjs';
 
 dotenv.config();
@@ -559,6 +559,20 @@ fastify.post('/api/images/:id/enhance', { preHandler: requireAuth }, async (requ
       temperature: targetAdjustments.temperature !== undefined ? parseFloat(targetAdjustments.temperature) : 1.0,
       tint: targetAdjustments.tint !== undefined ? parseFloat(targetAdjustments.tint) : 1.0
     };
+
+    // Auto-detect noise level if no AI analysis and user hasn't explicitly set denoise.
+    // This provides automatic noise reduction for images that haven't been analyzed
+    // by Ollama yet, or when the user clicks "Optimizar" without touching the denoise slider.
+    const userExplicitlySetDenoise = userAdjustments.denoise !== undefined;
+    const hasAiAnalysis = !!image.ai_analysis;
+    if (!userExplicitlySetDenoise && !hasAiAnalysis && options.denoise === 0) {
+      fastify.log.info('No AI analysis and no explicit denoise — auto-detecting noise level...');
+      const detectedNoise = await estimateNoiseLevel(image.filepath);
+      if (detectedNoise > 0.1) {
+        options.denoise = detectedNoise;
+        fastify.log.info(`Auto-detected noise level: ${detectedNoise.toFixed(2)} — applying denoise automatically.`);
+      }
+    }
 
     const ext = path.extname(image.filename) || '.jpg';
     const baseName = path.basename(image.filename, ext);

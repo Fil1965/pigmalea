@@ -6,6 +6,14 @@ All notable changes to the Pigmalea project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-07-28
+
+### Added
+- **Separación de Frecuencias en Denoise (`imageProcessor.mjs`):** El pipeline de reducción de ruido ahora implementa *frequency separation*: separa la imagen en una capa "base" (estructura, obtenida con blur gaussiano) y una capa "detalle" (original - base, high-pass). Los residuos de baja magnitud en la capa detalle (ruido) se atenuan proporcionalmente al nivel de `denoise`, mientras que los de alta magnitud (bordes y textura reales) se preservan. Esto limpia el ruido en zonas planas sin destruir bordes — la técnica usada por editores de foto profesionales.
+- **Denoise Selectivo por Luminancia (`imageProcessor.mjs`):** Nueva función que convierte la imagen a espacio de luminancia (Rec. 709), aplica denoise solo al canal Y (donde vive la mayoría del ruido digital), y recompone con el color original intacto. Preserva la fidelidad de color mientras limpia el ruido de luminancia.
+- **Detección Automática de Ruido (`imageProcessor.mjs`, `server.mjs`):** Nueva función `estimateNoiseLevel()` que estima el nivel de ruido de una imagen sin necesidad de IA ni EXIF: calcula la desviación absoluta mediana (MAD) del residuo high-pass sobre una versión reducida a 256px, y mapea el resultado a `0.0-1.0`. Cuando una imagen no ha sido analizada por Ollama y el usuario no ha tocado el slider de denoise, el servidor la invoca automáticamente para aplicar reducción de ruido sin configuración manual.
+- **Detección Automática Integrada en `/enhance` (`server.mjs`):** Si la imagen no tiene análisis de IA y el usuario no especificó `denoise` explícitamente, el servidor auto-detecta el nivel de ruido y lo aplica antes del resto del pipeline.
+
 ## [1.5.0] - 2026-07-28
 
 ### Changed
